@@ -311,3 +311,40 @@ func (r *UserRepository) GetAllInvites(ctx context.Context) ([]models.Invite, er
 
 	return invites, nil
 }
+
+func (r *UserRepository) SaveGithubInstallation(ctx context.Context, userID int, installationID int64, accountID int64, accountLogin string) error {
+	query := `INSERT INTO github_installations (user_id, installation_id, account_id, account_login) 
+	          VALUES ($1, $2, $3, $4) 
+	          ON CONFLICT (installation_id) 
+	          DO UPDATE SET user_id = EXCLUDED.user_id, account_id = EXCLUDED.account_id, account_login = EXCLUDED.account_login`
+	_, err := r.pool.Exec(ctx, query, userID, installationID, accountID, accountLogin)
+	return err
+}
+
+func (r *UserRepository) GetGithubInstallationByUserID(ctx context.Context, userID int) (*models.GithubInstallation, error) {
+	query := `SELECT id, user_id, installation_id, account_id, account_login, created_at 
+	          FROM github_installations WHERE user_id = $1 LIMIT 1`
+
+	var inst models.GithubInstallation
+	err := r.pool.QueryRow(ctx, query, userID).Scan(
+		&inst.ID,
+		&inst.UserID,
+		&inst.InstallationID,
+		&inst.AccountID,
+		&inst.AccountLogin,
+		&inst.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &inst, nil
+}
+
+func (r *UserRepository) DeleteGithubInstallation(ctx context.Context, userID int) error {
+	query := "DELETE FROM github_installations WHERE user_id = $1"
+	_, err := r.pool.Exec(ctx, query, userID)
+	return err
+}

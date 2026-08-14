@@ -78,13 +78,20 @@ func (h *UserHandler) ChangeUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var payload ChangeRoleRequestPayload
-	if err := decodeJSON(r, &payload); err != nil {
-		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
-		return
+	var role string
+	if r.Header.Get("Content-Type") == "application/json" {
+		var payload ChangeRoleRequestPayload
+		if err := decodeJSON(r, &payload); err != nil {
+			utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+			return
+		}
+		role = payload.Role
+	} else {
+		_ = r.ParseForm()
+		role = r.FormValue("role")
 	}
 
-	err = h.service.ChangeUserRole(ctx, id, models.UserRole(payload.Role))
+	err = h.service.ChangeUserRole(ctx, id, models.UserRole(role))
 	if err != nil {
 		if err == ErrUserNotFound {
 			utils.ErrorResponse(w, http.StatusNotFound, err)
@@ -99,13 +106,22 @@ func (h *UserHandler) ChangeUserRole(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var payload LoginRequestPayload
-	if err := decodeJSON(r, &payload); err != nil {
-		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
-		return
+	var email, password string
+	if r.Header.Get("Content-Type") == "application/json" {
+		var payload LoginRequestPayload
+		if err := decodeJSON(r, &payload); err != nil {
+			utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+			return
+		}
+		email = payload.Email
+		password = payload.Password
+	} else {
+		_ = r.ParseForm()
+		email = r.FormValue("email")
+		password = r.FormValue("password")
 	}
 
-	res, err := h.service.Login(ctx, payload.Email, payload.Password)
+	res, err := h.service.Login(ctx, email, password)
 	if err != nil {
 		if err == ErrInvalidCredentials {
 			utils.ErrorResponse(w, http.StatusUnauthorized, err)
@@ -126,13 +142,20 @@ func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) CreateNewInvite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var payload InviteRequestPayload
-	if err := decodeJSON(r, &payload); err != nil {
-		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
-		return
+	var email string
+	if r.Header.Get("Content-Type") == "application/json" {
+		var payload InviteRequestPayload
+		if err := decodeJSON(r, &payload); err != nil {
+			utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+			return
+		}
+		email = payload.Email
+	} else {
+		_ = r.ParseForm()
+		email = r.FormValue("email")
 	}
 
-	invite, err := h.service.CreateInvite(ctx, payload.Email)
+	invite, err := h.service.CreateInvite(ctx, email)
 	if err != nil {
 		utils.ErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -192,13 +215,24 @@ func (h *UserHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var payload AcceptInviteRequestPayload
-	if err := decodeJSON(r, &payload); err != nil {
-		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
-		return
+	var token, email, password string
+	if r.Header.Get("Content-Type") == "application/json" {
+		var payload AcceptInviteRequestPayload
+		if err := decodeJSON(r, &payload); err != nil {
+			utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+			return
+		}
+		token = payload.Token
+		email = payload.Email
+		password = payload.Password
+	} else {
+		_ = r.ParseForm()
+		token = r.FormValue("token")
+		email = r.FormValue("email")
+		password = r.FormValue("password")
 	}
 
-	user, err := h.service.AcceptInvite(ctx, payload.Token, payload.Email, payload.Password)
+	user, err := h.service.AcceptInvite(ctx, token, email, password)
 	if err != nil {
 		if err == ErrInviteNotFound || err == ErrEmailMismatch {
 			utils.ErrorResponse(w, http.StatusBadRequest, err)
@@ -265,15 +299,63 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	userCtx, ok := r.Context().Value(middleware.UserContextKey).(middleware.UserContext)
 	if !ok {
 		utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
 		return
 	}
 
+	installed, err := h.service.IsGithubInstalled(ctx, userCtx.UserID)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	utils.JsonResponse(w, http.StatusOK, UserResponsePayload{
-		ID:    userCtx.UserID,
-		Email: userCtx.Email,
-		Role:  string(userCtx.Role),
+		ID:              userCtx.UserID,
+		Email:           userCtx.Email,
+		Role:            string(userCtx.Role),
+		GithubInstalled: installed,
 	})
+}
+
+func (h *UserHandler) InstallGithub(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userCtx, ok := r.Context().Value(middleware.UserContextKey).(middleware.UserContext)
+	if !ok {
+		utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
+		return
+	}
+
+	var payload GithubInstallRequestPayload
+	if err := decodeJSON(r, &payload); err != nil {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+		return
+	}
+
+	err := h.service.InstallGithub(ctx, userCtx.UserID, payload.InstallationID)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, map[string]string{"message": "github app installed successfully"})
+}
+
+func (h *UserHandler) GetGithubRepositories(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userCtx, ok := r.Context().Value(middleware.UserContextKey).(middleware.UserContext)
+	if !ok {
+		utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
+		return
+	}
+
+	repos, err := h.service.GetGithubRepositories(ctx, userCtx.UserID)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, repos)
 }

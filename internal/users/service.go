@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"servicemanager/internal/models"
@@ -19,16 +20,22 @@ var (
 )
 
 type UserService struct {
-	repository *UserRepository
-	jwtSecret  string
-	jwtExpiry  string
+	repository       *UserRepository
+	jwtSecret        string
+	jwtExpiry        string
+	githubAppID      string
+	githubPrivateKey string
+	baseURL          string
 }
 
-func NewUserService(userRepository *UserRepository, jwtSecret string, jwtExpiry string) *UserService {
+func NewUserService(userRepository *UserRepository, jwtSecret string, jwtExpiry string, githubAppID string, githubPrivateKey string, baseURL string) *UserService {
 	return &UserService{
-		repository: userRepository,
-		jwtSecret:  jwtSecret,
-		jwtExpiry:  jwtExpiry,
+		repository:       userRepository,
+		jwtSecret:        jwtSecret,
+		jwtExpiry:        jwtExpiry,
+		githubAppID:      githubAppID,
+		githubPrivateKey: githubPrivateKey,
+		baseURL:          baseURL,
 	}
 }
 
@@ -65,13 +72,17 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 		return nil, err
 	}
 
+	inst, _ := s.repository.GetGithubInstallationByUserID(ctx, user.ID)
+	githubInstalled := inst != nil
+
 	return &LoginResponsePayload{
 		Token: token,
 		User: UserResponsePayload{
-			ID:        user.ID,
-			Email:     user.Email,
-			Role:      string(user.UserRole),
-			CreatedAt: user.CreatedAt,
+			ID:              user.ID,
+			Email:           user.Email,
+			Role:            string(user.UserRole),
+			GithubInstalled: githubInstalled,
+			CreatedAt:       user.CreatedAt,
 		},
 	}, nil
 }
@@ -84,7 +95,24 @@ func (s *UserService) CreateInvite(ctx context.Context, email string) (*models.I
 	}
 	token := hex.EncodeToString(tokenBytes)
 
-	return s.repository.CreateInvite(ctx, email, token)
+	invite, err := s.repository.CreateInvite(ctx, email, token)
+	if err == nil {
+		inviteURL := fmt.Sprintf("%s/accept-invite?token=%s&email=%s", s.baseURL, token, email)
+		htmlBody := fmt.Sprintf(`
+			<p>You have been invited to join Service Manager.</p>
+			<p><a href="%s" style="display:inline-block;padding:10px 20px;background-color:#0d6efd;color:#ffffff;text-decoration:none;border-radius:5px;">Accept Invitation</a></p>
+			<hr style="margin-top:20px;margin-bottom:20px;border:0;border-top:1px solid #eee;" />
+			<p style="font-size:12px;color:#666;">If the button above does not work, copy and paste the following URL into your browser:</p>
+			<p style="font-size:12px;color:#666;"><a href="%s">%s</a></p>
+		`, inviteURL, inviteURL, inviteURL)
+
+		utils.QueueHTMLEmail(
+			email,
+			"Invitation to Join Service Manager",
+			htmlBody,
+		)
+	}
+	return invite, err
 }
 
 func (s *UserService) GetAllInvites(ctx context.Context) ([]models.Invite, error) {
@@ -145,6 +173,12 @@ func (s *UserService) ForgotPassword(ctx context.Context, email string) (string,
 		return "", err
 	}
 
+	utils.QueueEmail(
+		email,
+		"Password Reset Request",
+		fmt.Sprintf("We received a request to reset your password. Use token %s to reset your password. This token expires in 1 hour.", token),
+	)
+
 	return token, nil
 }
 
@@ -182,4 +216,43 @@ func (s *UserService) ResetPassword(ctx context.Context, token, newPassword stri
 
 func (s *UserService) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	return s.repository.GetUserByID(ctx, id)
+}
+
+func (s *UserService) InstallGithub(ctx context.Context, userID int, installationID int64) error {
+	details, err := utils.GetInstallationDetails(s.githubAppID, s.githubPrivateKey, installationID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch installation from github: %w", err)
+	}
+
+	return s.repository.SaveGithubInstallation(ctx, userID, installationID, details.Account.ID, details.Account.Login)
+}
+
+func (s *UserService) IsGithubInstalled(ctx context.Context, userID int) (bool, error) {
+	inst, err := s.repository.GetGithubInstallationByUserID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return inst != nil, nil
+}
+
+func (s *UserService) GetGithubRepositories(ctx context.Context, userID int) ([]models.GithubRepo, error) {
+	inst, err := s.repository.GetGithubInstallationByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if inst == nil {
+		return nil, fmt.Errorf("github app not installed for this user")
+	}
+
+	repos, err := utils.GetInstallationRepositories(s.githubAppID, s.githubPrivateKey, inst.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort by pushed_at descending (most recent pushed first)
+	sort.Slice(repos, func(i, j int) bool {
+		return repos[i].PushedAt.After(repos[j].PushedAt)
+	})
+
+	return repos, nil
 }

@@ -13,7 +13,7 @@ import (
 func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 	mux := http.NewServeMux()
 	userRepo := NewUserRepository(pool)
-	userService := NewUserService(userRepo, env.JWT_SECRET, env.JWT_EXPIRY)
+	userService := NewUserService(userRepo, env.JWT_SECRET, env.JWT_EXPIRY, env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY, env.BASE_URL)
 	userHandler := NewUserHandler(userService)
 
 	// Public Routes
@@ -31,6 +31,8 @@ func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 
 	// Authenticated Routes
 	mux.Handle("GET /me", authMw(http.HandlerFunc(userHandler.GetMe)))
+	mux.Handle("POST /github/installations", authMw(http.HandlerFunc(userHandler.InstallGithub)))
+	mux.Handle("GET /github/repos", authMw(http.HandlerFunc(userHandler.GetGithubRepositories)))
 
 	// Admin Only Routes
 	mux.Handle("GET /", adminOnly(http.HandlerFunc(userHandler.GetAllUsers)))

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 )
 
@@ -24,6 +25,8 @@ func JsonResponse(w http.ResponseWriter, status int, data any) {
 }
 
 func ErrorResponse(w http.ResponseWriter, status int, err error) {
+	// Log all API errors centrally
+	slog.Error("api error response", slog.Int("status", status), slog.Any("error", err))
 
 	response := APIResponse{
 		Success: false,

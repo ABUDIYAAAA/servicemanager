@@ -23,19 +23,26 @@ type UserContext struct {
 func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tokenString := ""
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization header missing"))
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+					tokenString = parts[1]
+				}
+			}
+
+			if tokenString == "" {
+				if cookie, err := r.Cookie("token"); err == nil {
+					tokenString = cookie.Value
+				}
+			}
+
+			if tokenString == "" {
+				utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization token missing"))
 				return
 			}
 
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-				utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("invalid authorization header format"))
-				return
-			}
-
-			tokenString := parts[1]
 			claims, err := utils.VerifyToken(tokenString, secret)
 			if err != nil {
 				utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("invalid or expired token"))

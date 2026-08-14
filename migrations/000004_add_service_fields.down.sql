@@ -1,0 +1,3 @@
+ALTER TABLE services DROP COLUMN IF EXISTS status;
+ALTER TABLE services DROP COLUMN IF EXISTS build_command;
+ALTER TABLE services DROP COLUMN IF EXISTS run_command;

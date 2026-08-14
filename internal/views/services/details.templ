@@ -1,0 +1,281 @@
+package services
+
+import (
+	"fmt"
+	"servicemanager/internal/models"
+	"servicemanager/internal/views/layouts"
+)
+
+templ Details(s models.Service) {
+	@layouts.Layout("Service Details - " + s.Name) {
+		<!-- Header -->
+		<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+			<div>
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+						<li class="breadcrumb-item active" aria-current="page">{ s.Name }</li>
+					</ol>
+				</nav>
+				<h1 class="h3 mb-0 d-inline-block align-middle me-3">{ s.Name }</h1>
+				if s.Status == "draft" {
+					<span class="badge bg-warning text-dark align-middle">draft</span>
+				} else if s.Status == "deploying" {
+					<span class="badge bg-primary align-middle">deploying</span>
+				} else {
+					<span class="badge bg-success align-middle">{ s.Status }</span>
+				}
+			</div>
+			<div>
+				<a href={ templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)) } class="btn btn-outline-primary">Edit Configuration</a>
+			</div>
+		</div>
+
+		<!-- Tabs Nav -->
+		<ul class="nav nav-tabs" id="serviceTabs" role="tablist">
+			<li class="nav-item" role="presentation">
+				<button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+			</li>
+			<li class="nav-item" role="presentation">
+				<button class="nav-link" id="envs-tab" data-bs-toggle="tab" data-bs-target="#envs" type="button" role="tab" aria-controls="envs" aria-selected="false">Environment Variables</button>
+			</li>
+			<li class="nav-item" role="presentation">
+				<button class="nav-link" id="infisical-tab" data-bs-toggle="tab" data-bs-target="#infisical" type="button" role="tab" aria-controls="infisical" aria-selected="false">Infisical Settings</button>
+			</li>
+			<li class="nav-item" role="presentation">
+				<button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">Logs</button>
+			</li>
+		</ul>
+
+		<!-- Tab Contents -->
+		<div class="tab-content pt-3" id="serviceTabsContent">
+			<!-- Overview Tab -->
+			<div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+				<div class="row">
+					<div class="col-md-6 mb-4">
+						<div class="card shadow-sm h-100">
+							<div class="card-body">
+								<h5 class="card-title h6 text-uppercase text-muted mb-3">Deployment Properties</h5>
+								<table class="table table-borderless align-middle mb-0">
+									<tbody>
+										<tr>
+											<th class="ps-0" style="width: 40%;">Directory Path:</th>
+											<td><code>{ s.DirectoryPath }</code></td>
+										</tr>
+										<tr>
+											<th class="ps-0">Port:</th>
+											<td>
+												if s.Port > 0 {
+													<code>{ fmt.Sprintf("%d", s.Port) }</code>
+												} else {
+													<span class="text-muted">Not configured</span>
+												}
+											</td>
+										</tr>
+										<tr>
+											<th class="ps-0">SSL Status:</th>
+											<td>
+												if s.SSLStatus == "active" {
+													<span class="text-success">● Active</span>
+												} else {
+													<span class="text-muted">○ Inactive</span>
+												}
+											</td>
+										</tr>
+										<tr>
+											<th class="ps-0">Created At:</th>
+											<td>{ s.CreatedAt.Format("2006-01-02 15:04:05") }</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+
+					<div class="col-md-6 mb-4">
+						<div class="card shadow-sm h-100">
+							<div class="card-body">
+								<h5 class="card-title h6 text-uppercase text-muted mb-3">Repository & Commands</h5>
+								<table class="table table-borderless align-middle mb-0">
+									<tbody>
+										<tr>
+											<th class="ps-0" style="width: 40%;">GitHub Repository:</th>
+											<td>
+												if s.GithubRepoName != "" {
+													<span class="badge bg-info text-dark">{ s.GithubRepoName }</span>
+												} else {
+													<span class="text-muted">None linked</span>
+												}
+											</td>
+										</tr>
+										<tr>
+											<th class="ps-0">Build Command:</th>
+											<td>
+												if s.BuildCommand != "" {
+													<code>{ s.BuildCommand }</code>
+												} else {
+													<span class="text-muted">None (skip build)</span>
+												}
+											</td>
+										</tr>
+										<tr>
+											<th class="ps-0">Run Command:</th>
+											<td>
+												if s.RunCommand != "" {
+													<code>{ s.RunCommand }</code>
+												} else {
+													<span class="text-muted">Not configured</span>
+												}
+											</td>
+										</tr>
+										<tr>
+											<th class="ps-0">Description:</th>
+											<td>{ s.Description }</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Environment Variables Tab -->
+			<div class="tab-pane fade" id="envs" role="tabpanel" aria-labelledby="envs-tab">
+				<div class="card shadow-sm">
+					<div class="card-body">
+						<h5 class="card-title h6 text-uppercase text-muted mb-3">Active Environment Variables</h5>
+						if len(s.EnvVars) == 0 {
+							<p class="text-muted my-3 text-center">No environment variables configured.</p>
+						} else {
+							<div class="table-responsive">
+								<table class="table table-striped align-middle mb-0">
+									<thead>
+										<tr>
+											<th style="width: 40%;">Variable Key</th>
+											<th>Value</th>
+										</tr>
+									</thead>
+									<tbody>
+										for k, v := range s.EnvVars {
+											<tr>
+												<td><code>{ k }</code></td>
+												<td><code>{ v }</code></td>
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						}
+					</div>
+				</div>
+			</div>
+
+			<!-- Infisical Settings Tab -->
+			<div class="tab-pane fade" id="infisical" role="tabpanel" aria-labelledby="infisical-tab">
+				<div class="card shadow-sm">
+					<div class="card-body">
+						<h5 class="card-title h6 text-uppercase text-muted mb-3">Infisical Integration Details</h5>
+						<p class="text-muted small">Secrets are managed automatically by the system using the organization's global Infisical Universal Auth credentials.</p>
+						<table class="table table-borderless align-middle mb-0">
+							<tbody>
+								<tr>
+									<th style="width: 25%;">Workspace / Project ID:</th>
+									<td>
+										if s.InfisicalWorkspaceID != "" {
+											<code>{ s.InfisicalWorkspaceID }</code>
+										} else {
+											<span class="text-muted">Auto-assigned upon sync</span>
+										}
+									</td>
+								</tr>
+								<tr>
+									<th>Sync Environment:</th>
+									<td>
+										if s.InfisicalEnv != "" {
+											<span class="badge bg-secondary">{ s.InfisicalEnv }</span>
+										} else {
+											<span class="badge bg-secondary">dev</span>
+										}
+									</td>
+								</tr>
+								<tr>
+									<th>Sync Status:</th>
+									<td>
+										if s.Status == "deploying" || s.Status == "active" {
+											<span class="text-success">● Connected & Synced</span>
+										} else {
+											<span class="text-muted">○ Pending Deployment</span>
+										}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+
+			<!-- Logs Tab -->
+			<div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+				<div class="row">
+					<div class="col-md-6 mb-4">
+						<div class="card shadow-sm">
+							<div class="card-body">
+								<h5 class="card-title h6 text-uppercase text-muted mb-3">Build Logs</h5>
+								<div class="p-3 bg-dark text-white rounded font-monospace" style="height: 350px; overflow-y: auto;">
+									if s.BuildLogs != "" {
+										<pre class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">{ s.BuildLogs }</pre>
+									} else {
+										<span class="text-muted small">No build logs available. Build has not run yet.</span>
+									}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="col-md-6 mb-4">
+						<div class="card shadow-sm">
+							<div class="card-body">
+								<h5 class="card-title h6 text-uppercase text-muted mb-3">Runtime Logs</h5>
+								<div class="p-3 bg-dark text-white rounded font-monospace" style="height: 350px; overflow-y: auto;">
+									if s.RuntimeLogs != "" {
+										<pre class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">{ s.RuntimeLogs }</pre>
+									} else {
+										<span class="text-muted small">No runtime logs available. Server has not started.</span>
+									}
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Script to load target tab on page refresh -->
+		<script>
+			document.addEventListener("DOMContentLoaded", function() {
+				var hash = window.location.hash;
+				if (hash) {
+					var tabElement = document.querySelector('button[data-bs-target="' + hash + '"]');
+					if (tabElement) {
+						var tab = new bootstrap.Tab(tabElement);
+						tab.show();
+					}
+				}
+
+				// Update URL hash when a tab changes
+				var tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
+				tabEls.forEach(function(el) {
+					el.addEventListener('shown.bs.tab', function(e) {
+						var target = e.target.getAttribute("data-bs-target");
+						if (history.replaceState) {
+							history.replaceState(null, null, target);
+						} else {
+							location.hash = target;
+						}
+					});
+				});
+			});
+		</script>
+	}
+}

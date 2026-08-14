@@ -1,0 +1,561 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Service Manager API",
+    "version": "1.0.0",
+    "description": "API Documentation for Service Manager service, including authentication, invites, password resets, and GitHub App integrations."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Local development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Input your JWT token in the format: `Bearer <token>`"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": { "type": "string", "example": "unauthorized" }
+        }
+      },
+      "SuccessMessageResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string", "example": "operation completed successfully" }
+            }
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "admin@example.com" },
+          "password": { "type": "string", "example": "AdminPassword123!" }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "email": { "type": "string", "format": "email", "example": "admin@example.com" },
+          "role": { "type": "string", "enum": ["admin", "user"], "example": "admin" },
+          "github_installed": { "type": "boolean", "example": false },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-08-14T00:00:00Z" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+              "user": { "$ref": "#/components/schemas/UserResponse" }
+            }
+          }
+        }
+      },
+      "InviteRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "newuser@example.com" }
+        }
+      },
+      "InviteResponseData": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "email": { "type": "string", "format": "email", "example": "newuser@example.com" },
+          "token": { "type": "string", "example": "9a0a034293f0b0948cd89ee303d8de7f3..." },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "InviteResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": { "$ref": "#/components/schemas/InviteResponseData" }
+        }
+      },
+      "AcceptInviteRequest": {
+        "type": "object",
+        "required": ["token", "email", "password"],
+        "properties": {
+          "token": { "type": "string", "example": "9a0a034293f0b0948cd89ee303d8de7f3..." },
+          "email": { "type": "string", "format": "email", "example": "newuser@example.com" },
+          "password": { "type": "string", "example": "SecurePass123!" }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "admin@example.com" }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": ["token", "password"],
+        "properties": {
+          "token": { "type": "string", "example": "66df7c0500e28f11de87247384a32ff..." },
+          "password": { "type": "string", "example": "NewSecurePass123!" }
+        }
+      },
+      "ChangeRoleRequest": {
+        "type": "object",
+        "required": ["role"],
+        "properties": {
+          "role": { "type": "string", "enum": ["admin", "user"], "example": "admin" }
+        }
+      },
+      "GithubInstallRequest": {
+        "type": "object",
+        "required": ["installation_id"],
+        "properties": {
+          "installation_id": { "type": "integer", "format": "int64", "example": 4582841 }
+        }
+      },
+      "GithubRepo": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "example": 10293021 },
+          "name": { "type": "string", "example": "servicesmanager" },
+          "full_name": { "type": "string", "example": "ABUDIYAAAA/servicesmanager" },
+          "private": { "type": "boolean", "example": true },
+          "description": { "type": "string", "example": "Service Manager dev platform" },
+          "html_url": { "type": "string", "example": "https://github.com/ABUDIYAAAA/servicesmanager" },
+          "pushed_at": { "type": "string", "format": "date-time" },
+          "clone_url": { "type": "string", "example": "https://github.com/ABUDIYAAAA/servicesmanager.git" },
+          "default_branch": { "type": "string", "example": "main" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/users/login": {
+      "post": {
+        "summary": "Authenticate user",
+        "description": "Verifies credentials and returns a JWT access token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/logout": {
+      "post": {
+        "summary": "Logout user",
+        "description": "Clears user session context (stateless, client should discard token).",
+        "responses": {
+          "200": {
+            "description": "Logged out successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/accept-invite": {
+      "post": {
+        "summary": "Accept an invitation",
+        "description": "Registers a new account using a valid invite token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AcceptInviteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/UserResponse" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token or mismatch",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/forgot-password": {
+      "post": {
+        "summary": "Forgot password request",
+        "description": "Triggers a password reset token to be generated and emailed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ForgotPasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset token generated and returned in body for testing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string", "example": "password reset email sent" },
+                        "token": { "type": "string", "example": "66df7c0500e28f11de87247384a32ff..." }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/reset-password": {
+      "post": {
+        "summary": "Reset password",
+        "description": "Uses reset token to update user's password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ResetPasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Token expired or invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get current user info",
+        "description": "Returns current logged-in user profile, including GitHub App installation status.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User details response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/UserResponse" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/github/installations": {
+      "post": {
+        "summary": "Register GitHub App installation",
+        "description": "Registers a GitHub App installation ID to the current user's profile.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GithubInstallRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Installation verified and saved successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/users/github/repos": {
+      "get": {
+        "summary": "Get GitHub repositories",
+        "description": "Fetches a list of repositories accessible to the user's GitHub installation, sorted by most recent push.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of repositories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/GithubRepo" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/users/": {
+      "get": {
+        "summary": "List all users",
+        "description": "Returns a list of all registered users (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Users list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/UserResponse" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          }
+        }
+      }
+    },
+    "/users/invite": {
+      "post": {
+        "summary": "Create registration invite",
+        "description": "Generates a new invitation token and queues an invite email (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InviteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invite created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InviteResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/invites": {
+      "get": {
+        "summary": "List active invites",
+        "description": "Returns a list of all pending/active registration invites (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Invites list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/InviteResponseData" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/invite/{token}": {
+      "delete": {
+        "summary": "Revoke an invite",
+        "description": "Deletes/revokes a registration invite token (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Invite token to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "delete": {
+        "summary": "Delete a user account",
+        "description": "Removes a user account from the system (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "User ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/role": {
+      "patch": {
+        "summary": "Change user role",
+        "description": "Updates the role for a specific user ID (Admin Only).",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "User ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChangeRoleRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessMessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

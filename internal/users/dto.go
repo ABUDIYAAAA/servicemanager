@@ -38,10 +38,11 @@ type ChangeRoleRequestPayload struct {
 }
 
 type UserResponsePayload struct {
-	ID        int       `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              int       `json:"id"`
+	Email           string    `json:"email"`
+	Role            string    `json:"role"`
+	GithubInstalled bool      `json:"github_installed"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type InviteResponsePayload struct {
@@ -49,4 +50,8 @@ type InviteResponsePayload struct {
 	Email     string    `json:"email"`
 	Token     string    `json:"token"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type GithubInstallRequestPayload struct {
+	InstallationID int64 `json:"installation_id" validate:"required"`
 }

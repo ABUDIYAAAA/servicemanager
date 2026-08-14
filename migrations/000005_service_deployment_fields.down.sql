@@ -1,0 +1,10 @@
+ALTER TABLE services DROP COLUMN IF EXISTS port;
+ALTER TABLE services DROP COLUMN IF EXISTS env_vars;
+ALTER TABLE services DROP COLUMN IF EXISTS infisical_workspace_id;
+ALTER TABLE services DROP COLUMN IF EXISTS infisical_env;
+ALTER TABLE services DROP COLUMN IF EXISTS infisical_client_id;
+ALTER TABLE services DROP COLUMN IF EXISTS infisical_client_secret;
+ALTER TABLE services DROP COLUMN IF EXISTS directory_path;
+ALTER TABLE services DROP COLUMN IF EXISTS ssl_status;
+ALTER TABLE services DROP COLUMN IF EXISTS build_logs;
+ALTER TABLE services DROP COLUMN IF EXISTS runtime_logs;
