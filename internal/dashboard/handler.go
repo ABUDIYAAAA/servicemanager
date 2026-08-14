@@ -54,8 +54,8 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		invites, _ = h.userService.GetAllInvites(ctx)
 	}
 
-	githubInstalled, _ := h.userService.IsGithubInstalled(ctx, currentUser.ID)
-	if githubInstalled {
+	installations, _ := h.userService.GetAllGithubInstallations(ctx, currentUser.ID)
+	if len(installations) > 0 {
 		githubRepos, _ = h.userService.GetGithubRepositories(ctx, currentUser.ID)
 	}
 
@@ -73,7 +73,7 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		invites,
 		allServices,
 		githubRepos,
-		githubInstalled,
+		installations,
 		githubAuthURL,
 		inviteErr,
 		serviceErr,
@@ -88,9 +88,19 @@ func (h *DashboardHandler) GetGithubCallback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	setupAction := r.URL.Query().Get("setup_action")
 	instIDStr := r.URL.Query().Get("installation_id")
+
+	// Handle cases where GitHub redirects without an installation_id
+	// This happens on org installation requests (setup_action=request) or other flows
 	if instIDStr == "" {
-		http.Redirect(w, r, "/?service_error=No installation ID provided in GitHub callback#services", http.StatusSeeOther)
+		if setupAction == "request" {
+			// Org admin needs to approve the installation request
+			http.Redirect(w, r, "/?service_error=Installation request sent to your organization admin for approval#services", http.StatusSeeOther)
+			return
+		}
+		// No installation_id and no known setup_action — redirect gracefully
+		http.Redirect(w, r, "/#services", http.StatusSeeOther)
 		return
 	}
 

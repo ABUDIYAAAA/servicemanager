@@ -21,7 +21,7 @@ func Dashboard(
 	invites []models.Invite,
 	servicesList []models.Service,
 	githubRepos []models.GithubRepo,
-	githubInstalled bool,
+	installations []models.GithubInstallation,
 	githubAuthURL string,
 	inviteError string,
 	serviceError string,
@@ -84,39 +84,49 @@ func Dashboard(
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span>)</p></div><div><form method=\"POST\" action=\"/logout\"><button type=\"submit\" class=\"btn btn-outline-danger\">Logout</button></form></div></div><!-- Nav Tabs --> <ul class=\"nav nav-tabs\" id=\"dashboardTabs\" role=\"tablist\"><li class=\"nav-item\" role=\"presentation\"><button class=\"nav-link active\" id=\"services-tab\" data-bs-toggle=\"tab\" data-bs-target=\"#services\" type=\"button\" role=\"tab\" aria-controls=\"services\" aria-selected=\"true\">Services</button></li><li class=\"nav-item\" role=\"presentation\"><button class=\"nav-link\" id=\"users-tab\" data-bs-toggle=\"tab\" data-bs-target=\"#users\" type=\"button\" role=\"tab\" aria-controls=\"users\" aria-selected=\"false\">Users</button></li></ul><!-- Tab Content --> <div class=\"tab-content\" id=\"dashboardTabsContent\"><!-- Services Tab --><div class=\"tab-pane fade show active\" id=\"services\" role=\"tabpanel\" aria-labelledby=\"services-tab\"><div class=\"row pt-3\"><!-- Left: Add Service Form (Admins only) -->")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span>)</p></div><div><form method=\"POST\" action=\"/logout\"><button type=\"submit\" class=\"btn btn-outline-danger\">Logout</button></form></div></div><!-- Nav Tabs --> <ul class=\"nav nav-tabs\" id=\"dashboardTabs\" role=\"tablist\"><li class=\"nav-item\" role=\"presentation\"><button class=\"nav-link active\" id=\"services-tab\" data-bs-toggle=\"tab\" data-bs-target=\"#services\" type=\"button\" role=\"tab\" aria-controls=\"services\" aria-selected=\"true\">Services</button></li><li class=\"nav-item\" role=\"presentation\"><button class=\"nav-link\" id=\"users-tab\" data-bs-toggle=\"tab\" data-bs-target=\"#users\" type=\"button\" role=\"tab\" aria-controls=\"users\" aria-selected=\"false\">Users</button></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if currentUser.UserRole == models.RoleAdmin {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"col-md-4\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<li class=\"nav-item\" role=\"presentation\"><button class=\"nav-link\" id=\"system-logs-tab\" data-bs-toggle=\"tab\" data-bs-target=\"#system-logs\" type=\"button\" role=\"tab\" aria-controls=\"system-logs\" aria-selected=\"false\">System Logs</button></li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</ul><!-- Tab Content --> <div class=\"tab-content\" id=\"dashboardTabsContent\"><!-- Services Tab --><div class=\"tab-pane fade show active\" id=\"services\" role=\"tabpanel\" aria-labelledby=\"services-tab\"><div class=\"row pt-3\"><!-- Left: Add Service Form (Admins only) -->")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if currentUser.UserRole == models.RoleAdmin {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"col-md-4\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if serviceError != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"alert alert-danger\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"alert alert-danger\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(serviceError)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/dashboard/dashboard.templ`, Line: 54, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/dashboard/dashboard.templ`, Line: 59, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = viewsServices.AddServiceForm(githubRepos, githubInstalled, githubAuthURL).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = viewsServices.AddServiceForm(githubRepos, installations, githubAuthURL).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"col-md-8\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Configured Services</h5><div id=\"services-list-container\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><div class=\"col-md-8\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Configured Services</h5><div id=\"services-list-container\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -124,12 +134,12 @@ func Dashboard(
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div></div></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></div></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"col-md-12\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Configured Services</h5>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"col-md-12\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Configured Services</h5>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -137,40 +147,40 @@ func Dashboard(
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></div><!-- Users Tab --><div class=\"tab-pane fade\" id=\"users\" role=\"tabpanel\" aria-labelledby=\"users-tab\"><div class=\"row pt-3\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div></div><!-- Users Tab --><div class=\"tab-pane fade\" id=\"users\" role=\"tabpanel\" aria-labelledby=\"users-tab\"><div class=\"row pt-3\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if currentUser.UserRole == models.RoleAdmin {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<!-- Invite User (Admins only) --> <div class=\"col-md-4\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<!-- Invite User (Admins only) --> <div class=\"col-md-4\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if inviteError != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"alert alert-danger\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"alert alert-danger\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(inviteError)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/dashboard/dashboard.templ`, Line: 88, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/dashboard/dashboard.templ`, Line: 93, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"card shadow-sm mb-4\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Invite User</h5><form method=\"POST\" action=\"/users/invite\"><div class=\"mb-3\"><label for=\"invite_email\" class=\"form-label\">Email address</label> <input type=\"email\" class=\"form-control\" id=\"invite_email\" name=\"email\" required placeholder=\"user@example.com\"></div><button type=\"submit\" class=\"btn btn-success w-100\">Send Invitation</button></form></div></div><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Pending Invitations</h5>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"card shadow-sm mb-4\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Invite User</h5><form method=\"POST\" action=\"/users/invite\"><div class=\"mb-3\"><label for=\"invite_email\" class=\"form-label\">Email address</label> <input type=\"email\" class=\"form-control\" id=\"invite_email\" name=\"email\" required placeholder=\"user@example.com\"></div><button type=\"submit\" class=\"btn btn-success w-100\">Send Invitation</button></form></div></div><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Pending Invitations</h5>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -178,7 +188,7 @@ func Dashboard(
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div></div></div><div class=\"col-md-8\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Registered Users</h5>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div></div></div><div class=\"col-md-8\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Registered Users</h5>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -186,12 +196,12 @@ func Dashboard(
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"col-md-12\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Registered Users</h5>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"col-md-12\"><div class=\"card shadow-sm\"><div class=\"card-body\"><h5 class=\"card-title mb-3\">Registered Users</h5>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -199,22 +209,32 @@ func Dashboard(
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div></div></div><!-- Github Connect Modal --> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if currentUser.UserRole == models.RoleAdmin && !githubInstalled {
+			if currentUser.UserRole == models.RoleAdmin {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<!-- System Logs Tab --> <div class=\"tab-pane fade\" id=\"system-logs\" role=\"tabpanel\" aria-labelledby=\"system-logs-tab\"><div class=\"row pt-3\"><div class=\"col-md-12\"><div class=\"card shadow-sm\"><div class=\"card-body\"><div class=\"d-flex justify-content-between align-items-center mb-3\"><h5 class=\"card-title mb-0\">System Application Logs (Live)</h5><span class=\"badge bg-success\" id=\"stream-status\">Connected</span></div><div id=\"system-logs-container\" class=\"p-3 bg-dark text-white rounded font-monospace\" style=\"height: 500px; overflow-y: auto;\"><pre id=\"system-logs-output\" class=\"mb-0 text-white\" style=\"white-space: pre-wrap; font-size: 13px;\"></pre></div></div></div></div></div><script>\n\t\t\t\t\t\tdocument.addEventListener(\"DOMContentLoaded\", function() {\n\t\t\t\t\t\t\tconst logsOutput = document.getElementById(\"system-logs-output\");\n\t\t\t\t\t\t\tconst statusBadge = document.getElementById(\"stream-status\");\n\t\t\t\t\t\t\tlet eventSource;\n\n\t\t\t\t\t\t\tfunction connectLogsStream() {\n\t\t\t\t\t\t\t\teventSource = new EventSource(\"/api/v1/admin/logs/stream\");\n\n\t\t\t\t\t\t\t\teventSource.onopen = function() {\n\t\t\t\t\t\t\t\t\tstatusBadge.textContent = \"Connected\";\n\t\t\t\t\t\t\t\t\tstatusBadge.className = \"badge bg-success\";\n\t\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\t\teventSource.onmessage = function(event) {\n\t\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\t\tconst log = JSON.parse(event.data);\n\t\t\t\t\t\t\t\t\t\tconst timestamp = log.time ? new Date(log.time).toISOString() : new Date().toISOString();\n\t\t\t\t\t\t\t\t\t\tconst level = log.level ? log.level.toUpperCase() : \"INFO\";\n\t\t\t\t\t\t\t\t\t\tconst message = log.message || \"\";\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\tlet fieldsStr = \"\";\n\t\t\t\t\t\t\t\t\t\tif (log.fields && Object.keys(log.fields).length > 0) {\n\t\t\t\t\t\t\t\t\t\t\tfieldsStr = \" \" + JSON.stringify(log.fields);\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\tlet colorClass = \"text-info\";\n\t\t\t\t\t\t\t\t\t\tif (level === \"WARN\") colorClass = \"text-warning\";\n\t\t\t\t\t\t\t\t\t\tif (level === \"ERROR\") colorClass = \"text-danger\";\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\tconst logLine = `[${timestamp}] <span class=\"${colorClass}\">${level}</span>: ${message}${fieldsStr}\\n`;\n\t\t\t\t\t\t\t\t\t\tlogsOutput.innerHTML += logLine;\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\tconst container = document.getElementById(\"system-logs-container\");\n\t\t\t\t\t\t\t\t\t\tcontainer.scrollTop = container.scrollHeight;\n\t\t\t\t\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\t\t\t\t\tlogsOutput.innerHTML += event.data + \"\\n\";\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\t\teventSource.onerror = function() {\n\t\t\t\t\t\t\t\t\tstatusBadge.textContent = \"Disconnected (Reconnecting...)\";\n\t\t\t\t\t\t\t\t\tstatusBadge.className = \"badge bg-danger\";\n\t\t\t\t\t\t\t\t\teventSource.close();\n\t\t\t\t\t\t\t\t\tsetTimeout(connectLogsStream, 3000);\n\t\t\t\t\t\t\t\t};\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tconst tabEl = document.getElementById('system-logs-tab');\n\t\t\t\t\t\t\tif (tabEl) {\n\t\t\t\t\t\t\t\ttabEl.addEventListener('shown.bs.tab', function () {\n\t\t\t\t\t\t\t\t\tif (!eventSource) {\n\t\t\t\t\t\t\t\t\t\tconnectLogsStream();\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t</script></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div><!-- Github Connect Modal --> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if currentUser.UserRole == models.RoleAdmin {
 				templ_7745c5c3_Err = viewsServices.GithubConnectModal(githubAuthURL).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " <script>\n\t\t\tdocument.addEventListener(\"DOMContentLoaded\", function() {\n\t\t\t\tvar hash = window.location.hash;\n\t\t\t\tif (hash) {\n\t\t\t\t\tvar tabElement = document.querySelector('button[data-bs-target=\"' + hash + '\"]');\n\t\t\t\t\tif (tabElement) {\n\t\t\t\t\t\tvar tab = new bootstrap.Tab(tabElement);\n\t\t\t\t\t\ttab.show();\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t// Update URL hash when a tab changes\n\t\t\t\tvar tabEls = document.querySelectorAll('button[data-bs-toggle=\"tab\"]');\n\t\t\t\ttabEls.forEach(function(el) {\n\t\t\t\t\tel.addEventListener('shown.bs.tab', function(e) {\n\t\t\t\t\t\tvar target = e.target.getAttribute(\"data-bs-target\");\n\t\t\t\t\t\tif (history.replaceState) {\n\t\t\t\t\t\t\thistory.replaceState(null, null, target);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tlocation.hash = target;\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t});\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " <script>\n\t\t\tdocument.addEventListener(\"DOMContentLoaded\", function() {\n\t\t\t\tvar hash = window.location.hash;\n\t\t\t\tif (hash) {\n\t\t\t\t\tvar tabElement = document.querySelector('button[data-bs-target=\"' + hash + '\"]');\n\t\t\t\t\tif (tabElement) {\n\t\t\t\t\t\tvar tab = new bootstrap.Tab(tabElement);\n\t\t\t\t\t\ttab.show();\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t// Update URL hash when a tab changes\n\t\t\t\tvar tabEls = document.querySelectorAll('button[data-bs-toggle=\"tab\"]');\n\t\t\t\ttabEls.forEach(function(el) {\n\t\t\t\t\tel.addEventListener('shown.bs.tab', function(e) {\n\t\t\t\t\t\tvar target = e.target.getAttribute(\"data-bs-target\");\n\t\t\t\t\t\tif (history.replaceState) {\n\t\t\t\t\t\t\thistory.replaceState(null, null, target);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tlocation.hash = target;\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

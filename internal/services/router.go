@@ -12,7 +12,8 @@ import (
 func ServiceRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 	mux := http.NewServeMux()
 	repo := NewServiceRepository(pool)
-	service := NewServiceService(repo)
+	deployRepo := NewDeploymentRepository(pool)
+	service := NewServiceService(repo, deployRepo)
 	handler := NewServiceHandler(service)
 
 	authMw := middleware.AuthMiddleware(env.JWT_SECRET)

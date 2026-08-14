@@ -18,5 +18,6 @@ type Service struct {
 	SSLStatus            string            `json:"ssl_status,omitempty"`
 	BuildLogs            string            `json:"build_logs,omitempty"`
 	RuntimeLogs          string            `json:"runtime_logs,omitempty"`
+	RootDirectory        string            `json:"root_directory"`
 	CreatedAt            time.Time         `json:"created_at"`
 }

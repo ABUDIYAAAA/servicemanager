@@ -18,7 +18,7 @@ func getEnvVarsJSON(m map[string]string) string {
 	return string(bytes)
 }
 
-templ Deploy(s models.Service, err string) {
+templ Deploy(s models.Service, dirs []string, err string) {
 	@layouts.Layout("Deploy Service") {
 		<div class="row justify-content-center">
 			<div class="col-md-8">
@@ -28,6 +28,12 @@ templ Deploy(s models.Service, err string) {
 						if err != "" {
 							<div class="alert alert-danger" role="alert">
 								{ err }
+							</div>
+						}
+						if len(dirs) == 1 && dirs[0] == "." {
+							<div class="alert alert-light border text-muted py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 13px;">
+								<span class="me-2">💡</span>
+								<span>Note: Could not retrieve repository directory structure. Ensure your GitHub App has <strong>Repository Contents: Read-only</strong> permission. You can still type the path manually below.</span>
 							</div>
 						}
 						<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)) }>
@@ -56,6 +62,17 @@ templ Deploy(s models.Service, err string) {
 												value={ fmt.Sprintf("%d", s.Port) } placeholder="e.g. 8080" min="1" max="65535" />
 											<div class="form-text">Network port the web server listens on.</div>
 										</div>
+										<div class="col-md-6 mb-3">
+											<label for="root_directory" class="form-label">Root Directory</label>
+											<input type="text" class="form-control font-monospace" id="root_directory" name="root_directory" 
+												list="root_directory_options" value={ s.RootDirectory } placeholder="e.g. . or apps/api" />
+											<datalist id="root_directory_options">
+												for _, dir := range dirs {
+													<option value={ dir }></option>
+												}
+											</datalist>
+											<div class="form-text">Choose or type the repository root subdirectory (monorepo support).</div>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -83,6 +100,7 @@ templ Deploy(s models.Service, err string) {
 									<div id="env-vars-rows">
 										<!-- Dynamic env variables are populated here -->
 									</div>
+									<div id="env-vars-data" data-env-vars={ getEnvVarsJSON(s.EnvVars) } class="d-none"></div>
 								</div>
 							</div>
 
@@ -158,7 +176,8 @@ templ Deploy(s models.Service, err string) {
 
 			// Render existing variables on load
 			document.addEventListener('DOMContentLoaded', function() {
-				const initialVars = JSON.parse( { getEnvVarsJSON(s.EnvVars) } );
+				const dataEl = document.getElementById('env-vars-data');
+				const initialVars = JSON.parse(dataEl ? dataEl.getAttribute('data-env-vars') : '{}');
 				for (const [key, val] of Object.entries(initialVars)) {
 					addEnvRow(key, val);
 				}

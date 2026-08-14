@@ -28,7 +28,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
 	                 port, env_vars, infisical_workspace_id, infisical_env, 
-	                 directory_path, ssl_status, build_logs, runtime_logs, created_at 
+	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
 	          FROM services ORDER BY id ASC`
 
 	rows, err := r.pool.Query(ctx, query)
@@ -52,7 +52,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 		err := rows.Scan(
 			&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
 			&port, &envVarsBytes, &workspaceID, &infEnv,
-			&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.CreatedAt,
+			&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -102,7 +102,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models.Service, error) {
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
 	                 port, env_vars, infisical_workspace_id, infisical_env, 
-	                 directory_path, ssl_status, build_logs, runtime_logs, created_at 
+	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
 	          FROM services WHERE id = $1`
 
 	var s models.Service
@@ -119,7 +119,7 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
 		&port, &envVarsBytes, &workspaceID, &infEnv,
-		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.CreatedAt,
+		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -163,11 +163,11 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 }
 
 func (r *ServiceRepository) CreateService(ctx context.Context, name string, description string, repoName string) (*models.Service, error) {
-	query := `INSERT INTO services (name, description, github_repo_name, status, ssl_status, build_logs, runtime_logs) 
-	          VALUES ($1, $2, $3, 'draft', 'inactive', '', '') 
+	query := `INSERT INTO services (name, description, github_repo_name, status, ssl_status, build_logs, runtime_logs, root_directory) 
+	          VALUES ($1, $2, $3, 'draft', 'inactive', '', '', '.') 
 	          RETURNING id, name, description, github_repo_name, status, build_command, run_command, 
 	                    port, env_vars, infisical_workspace_id, infisical_env, 
-	                    directory_path, ssl_status, build_logs, runtime_logs, created_at`
+	                    directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at`
 
 	var s models.Service
 	var desc *string
@@ -183,7 +183,7 @@ func (r *ServiceRepository) CreateService(ctx context.Context, name string, desc
 	err := r.pool.QueryRow(ctx, query, name, description, repoName).Scan(
 		&s.ID, &s.Name, &desc, &repoNameStr, &s.Status, &buildCmd, &runCmd,
 		&port, &envVarsBytes, &workspaceID, &infEnv,
-		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.CreatedAt,
+		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -234,6 +234,7 @@ func (r *ServiceRepository) UpdateDeployConfig(
 	envVars map[string]string,
 	workspaceID string,
 	infEnv string,
+	rootDirectory string,
 ) error {
 	envVarsBytes, err := json.Marshal(envVars)
 	if err != nil {
@@ -246,12 +247,12 @@ func (r *ServiceRepository) UpdateDeployConfig(
 	query := `UPDATE services 
 	          SET status = $2, build_command = $3, run_command = $4, port = $5, env_vars = $6, 
 	              infisical_workspace_id = $7, infisical_env = $8,
-	              build_logs = $9, runtime_logs = $10
+	              build_logs = $9, runtime_logs = $10, root_directory = $11
 	          WHERE id = $1`
 
 	cmdTag, err := r.pool.Exec(
 		ctx, query, id, status, buildCmd, runCmd, port, envVarsBytes,
-		workspaceID, infEnv, mockBuildLogs, mockRuntimeLogs,
+		workspaceID, infEnv, mockBuildLogs, mockRuntimeLogs, rootDirectory,
 	)
 	if err != nil {
 		return err
@@ -265,6 +266,18 @@ func (r *ServiceRepository) UpdateDeployConfig(
 func (r *ServiceRepository) DeleteService(ctx context.Context, id int) error {
 	query := "DELETE FROM services WHERE id = $1"
 	cmdTag, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrServiceNotFound
+	}
+	return nil
+}
+
+func (r *ServiceRepository) UpdateStatus(ctx context.Context, id int, status string) error {
+	query := "UPDATE services SET status = $2 WHERE id = $1"
+	cmdTag, err := r.pool.Exec(ctx, query, id, status)
 	if err != nil {
 		return err
 	}

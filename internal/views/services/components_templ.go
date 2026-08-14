@@ -11,7 +11,28 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	"servicemanager/internal/models"
+	"strings"
 )
+
+func getOrg(fullName string) string {
+	parts := strings.Split(fullName, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return fullName
+}
+
+func deduplicateInstallations(installations []models.GithubInstallation) []models.GithubInstallation {
+	seen := make(map[string]bool)
+	var unique []models.GithubInstallation
+	for _, inst := range installations {
+		if !seen[inst.AccountLogin] {
+			seen[inst.AccountLogin] = true
+			unique = append(unique, inst)
+		}
+	}
+	return unique
+}
 
 func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -62,7 +83,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", s.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 31, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 53, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -75,7 +96,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/services/%d", s.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 32, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 54, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -88,7 +109,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(s.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 32, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 54, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -101,7 +122,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(s.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 33, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 55, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -119,7 +140,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(s.GithubRepoName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 36, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 58, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -157,7 +178,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(s.Status)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 47, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 69, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -180,7 +201,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 				var templ_7745c5c3_Var8 templ.SafeURL
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 52, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 74, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -193,7 +214,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/api/v1/services/%d", s.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 56, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 78, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 				if templ_7745c5c3_Err != nil {
@@ -217,7 +238,7 @@ func ServicesTable(services []models.Service, isAdmin bool) templ.Component {
 	})
 }
 
-func AddServiceForm(githubRepos []models.GithubRepo, githubInstalled bool, githubAuthURL string) templ.Component {
+func AddServiceForm(githubRepos []models.GithubRepo, installations []models.GithubInstallation, githubAuthURL string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -242,20 +263,20 @@ func AddServiceForm(githubRepos []models.GithubRepo, githubInstalled bool, githu
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if githubInstalled {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<form method=\"POST\" action=\"/services/add\"><div class=\"mb-3\"><label for=\"name\" class=\"form-label\">Service Name</label> <input type=\"text\" class=\"form-control\" id=\"name\" name=\"name\" required placeholder=\"e.g. Auth Service\"></div><div class=\"mb-3\"><label for=\"description\" class=\"form-label\">Description</label> <textarea class=\"form-control\" id=\"description\" name=\"description\" placeholder=\"e.g. Manages user sessions\"></textarea></div><div class=\"mb-3\"><label for=\"github_repo_name\" class=\"form-label\">GitHub Repository</label> <select class=\"form-select\" id=\"github_repo_name\" name=\"github_repo_name\"><option value=\"\">-- Select GitHub Repository (Optional) --</option> ")
+		if len(installations) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<form method=\"POST\" action=\"/services/add\"><div class=\"mb-3\"><label for=\"name\" class=\"form-label\">Service Name</label> <input type=\"text\" class=\"form-control\" id=\"name\" name=\"name\" required placeholder=\"e.g. Auth Service\"></div><div class=\"mb-3\"><label for=\"description\" class=\"form-label\">Description</label> <textarea class=\"form-control\" id=\"description\" name=\"description\" placeholder=\"e.g. Manages user sessions\"></textarea></div><div class=\"mb-3\"><label for=\"github_org\" class=\"form-label\">GitHub Organization</label> <select class=\"form-select\" id=\"github_org\" onchange=\"filterRepos()\"><option value=\"\">-- All Organizations --</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, repo := range githubRepos {
+			for _, inst := range deduplicateInstallations(installations) {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 string
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(repo.FullName)
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(inst.AccountLogin)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 91, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 113, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
@@ -266,30 +287,79 @@ func AddServiceForm(githubRepos []models.GithubRepo, githubInstalled bool, githu
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 string
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(repo.FullName)
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(inst.AccountLogin)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 91, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 113, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</option>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</option> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</select></div><button type=\"submit\" class=\"btn btn-primary\">Add Service</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<option value=\"add_new\">+ Add new Organization...</option></select></div><div class=\"mb-3\"><label for=\"github_repo_name\" class=\"form-label\">GitHub Repository</label> <select class=\"form-select\" id=\"github_repo_name\" name=\"github_repo_name\"><option value=\"\">-- Select GitHub Repository (Optional) --</option> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, repo := range githubRepos {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<option value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var13 string
+				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(repo.FullName)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 123, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" data-org=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var14 string
+				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(getOrg(repo.FullName))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 123, Col: 72}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var15 string
+				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(repo.Name)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 123, Col: 86}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</select></div><button type=\"submit\" class=\"btn btn-primary\">Add Service</button></form><script>\n\t\t\t\t\tfunction filterRepos() {\n\t\t\t\t\t\tvar org = document.getElementById(\"github_org\").value;\n\t\t\t\t\t\tif (org === \"add_new\") {\n\t\t\t\t\t\t\tvar m = new bootstrap.Modal(document.getElementById('githubConnectModal'));\n\t\t\t\t\t\t\tm.show();\n\t\t\t\t\t\t\tdocument.getElementById(\"github_org\").value = \"\";\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar repoSelect = document.getElementById(\"github_repo_name\");\n\t\t\t\t\t\tvar options = repoSelect.options;\n\t\t\t\t\t\tfor (var i = 1; i < options.length; i++) {\n\t\t\t\t\t\t\tvar opt = options[i];\n\t\t\t\t\t\t\tif (org === \"\" || opt.getAttribute(\"data-org\") === org) {\n\t\t\t\t\t\t\t\topt.style.display = \"\";\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\topt.style.display = \"none\";\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\trepoSelect.value = \"\";\n\t\t\t\t\t}\n\t\t\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"p-3 bg-light border rounded text-center\"><p class=\"mb-2 text-muted\">To add a service, you must first connect your GitHub account.</p><button type=\"button\" class=\"btn btn-dark\" data-bs-toggle=\"modal\" data-bs-target=\"#githubConnectModal\">Add Service</button></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div class=\"p-3 bg-light border rounded text-center\"><p class=\"mb-2 text-muted\">To add a service, you must first connect your GitHub account.</p><button type=\"button\" class=\"btn btn-dark\" data-bs-toggle=\"modal\" data-bs-target=\"#githubConnectModal\">Connect GitHub</button></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -313,25 +383,25 @@ func GithubConnectModal(githubAuthURL string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var13 == nil {
-			templ_7745c5c3_Var13 = templ.NopComponent
+		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var16 == nil {
+			templ_7745c5c3_Var16 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"modal fade\" id=\"githubConnectModal\" tabindex=\"-1\" aria-labelledby=\"githubConnectModalLabel\" aria-hidden=\"true\"><div class=\"modal-dialog\"><div class=\"modal-content\"><div class=\"modal-header\"><h5 class=\"modal-title\" id=\"githubConnectModalLabel\">GitHub Connection Required</h5><button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\" aria-label=\"Close\"></button></div><div class=\"modal-body\"><p>You must connect your GitHub account via our GitHub App to add a service.</p><p class=\"text-muted small\">This will redirect you to GitHub where you can authorize the app on your repository or organization.</p></div><div class=\"modal-footer\"><button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">Close</button> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"modal fade\" id=\"githubConnectModal\" tabindex=\"-1\" aria-labelledby=\"githubConnectModalLabel\" aria-hidden=\"true\"><div class=\"modal-dialog\"><div class=\"modal-content\"><div class=\"modal-header\"><h5 class=\"modal-title\" id=\"githubConnectModalLabel\">GitHub Connection Required</h5><button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\" aria-label=\"Close\"></button></div><div class=\"modal-body\"><p>You must connect your GitHub account via our GitHub App to add a service.</p><p class=\"text-muted small\">This will redirect you to GitHub where you can authorize the app on your repository or organization.</p></div><div class=\"modal-footer\"><button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">Close</button> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 templ.SafeURL
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(githubAuthURL))
+		var templ_7745c5c3_Var17 templ.SafeURL
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(githubAuthURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 123, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/components.templ`, Line: 178, Col: 43}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" target=\"_blank\" class=\"btn btn-primary\" onclick=\"var m = bootstrap.Modal.getInstance(document.getElementById('githubConnectModal')); if(m) m.hide();\">Connect GitHub</a></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\" target=\"_blank\" class=\"btn btn-primary\" onclick=\"var m = bootstrap.Modal.getInstance(document.getElementById('githubConnectModal')); if(m) m.hide();\">Connect GitHub</a></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

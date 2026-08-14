@@ -2,8 +2,30 @@ package services
 
 import (
 	"fmt"
+	"strings"
 	"servicemanager/internal/models"
 )
+
+func getOrg(fullName string) string {
+	parts := strings.Split(fullName, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return fullName
+}
+
+func deduplicateInstallations(installations []models.GithubInstallation) []models.GithubInstallation {
+	seen := make(map[string]bool)
+	var unique []models.GithubInstallation
+	for _, inst := range installations {
+		if !seen[inst.AccountLogin] {
+			seen[inst.AccountLogin] = true
+			unique = append(unique, inst)
+		}
+	}
+	return unique
+}
+
 
 templ ServicesTable(services []models.Service, isAdmin bool) {
 	<div class="table-responsive">
@@ -68,12 +90,12 @@ templ ServicesTable(services []models.Service, isAdmin bool) {
 	</div>
 }
 
-templ AddServiceForm(githubRepos []models.GithubRepo, githubInstalled bool, githubAuthURL string) {
+templ AddServiceForm(githubRepos []models.GithubRepo, installations []models.GithubInstallation, githubAuthURL string) {
 	<div class="card shadow-sm mb-4">
 		<div class="card-body">
 			<h5 class="card-title mb-3">Add Service</h5>
 			
-			if githubInstalled {
+			if len(installations) > 0 {
 				<form method="POST" action="/services/add">
 					<div class="mb-3">
 						<label for="name" class="form-label">Service Name</label>
@@ -84,24 +106,57 @@ templ AddServiceForm(githubRepos []models.GithubRepo, githubInstalled bool, gith
 						<textarea class="form-control" id="description" name="description" placeholder="e.g. Manages user sessions"></textarea>
 					</div>
 					<div class="mb-3">
+						<label for="github_org" class="form-label">GitHub Organization</label>
+						<select class="form-select" id="github_org" onchange="filterRepos()">
+							<option value="">-- All Organizations --</option>
+							for _, inst := range deduplicateInstallations(installations) {
+								<option value={ inst.AccountLogin }>{ inst.AccountLogin }</option>
+							}
+							<option value="add_new">+ Add new Organization...</option>
+						</select>
+					</div>
+					<div class="mb-3">
 						<label for="github_repo_name" class="form-label">GitHub Repository</label>
 						<select class="form-select" id="github_repo_name" name="github_repo_name">
 							<option value="">-- Select GitHub Repository (Optional) --</option>
 							for _, repo := range githubRepos {
-								<option value={ repo.FullName }>{ repo.FullName }</option>
+								<option value={ repo.FullName } data-org={ getOrg(repo.FullName) }>{ repo.Name }</option>
 							}
 						</select>
 					</div>
 					<button type="submit" class="btn btn-primary">Add Service</button>
 				</form>
+				<script>
+					function filterRepos() {
+						var org = document.getElementById("github_org").value;
+						if (org === "add_new") {
+							var m = new bootstrap.Modal(document.getElementById('githubConnectModal'));
+							m.show();
+							document.getElementById("github_org").value = "";
+							return;
+						}
+						var repoSelect = document.getElementById("github_repo_name");
+						var options = repoSelect.options;
+						for (var i = 1; i < options.length; i++) {
+							var opt = options[i];
+							if (org === "" || opt.getAttribute("data-org") === org) {
+								opt.style.display = "";
+							} else {
+								opt.style.display = "none";
+							}
+						}
+						repoSelect.value = "";
+					}
+				</script>
 			} else {
 				<div class="p-3 bg-light border rounded text-center">
 					<p class="mb-2 text-muted">To add a service, you must first connect your GitHub account.</p>
 					<button type="button" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#githubConnectModal">
-						Add Service
+						Connect GitHub
 					</button>
 				</div>
 			}
+
 		</div>
 	</div>
 }

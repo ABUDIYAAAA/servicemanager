@@ -26,7 +26,7 @@ func getEnvVarsJSON(m map[string]string) string {
 	return string(bytes)
 }
 
-func Deploy(s models.Service, err string) templ.Component {
+func Deploy(s models.Service, dirs []string, err string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -95,59 +95,114 @@ func Deploy(s models.Service, err string) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<form method=\"POST\" action=\"")
+			if len(dirs) == 1 && dirs[0] == "." {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"alert alert-light border text-muted py-2 px-3 mb-3 d-flex align-items-center\" style=\"font-size: 13px;\"><span class=\"me-2\">💡</span> <span>Note: Could not retrieve repository directory structure. Ensure your GitHub App has <strong>Repository Contents: Read-only</strong> permission. You can still type the path manually below.</span></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 33, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 39, Col: 90}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"><!-- Commands Section --><div class=\"card bg-light mb-4\"><div class=\"card-body\"><h5 class=\"card-title h6 mb-3 text-uppercase text-muted\">Build & Runtime Config</h5><div class=\"row\"><div class=\"col-md-6 mb-3\"><label for=\"build_command\" class=\"form-label\">Build Command</label> <input type=\"text\" class=\"form-control\" id=\"build_command\" name=\"build_command\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"><!-- Commands Section --><div class=\"card bg-light mb-4\"><div class=\"card-body\"><h5 class=\"card-title h6 mb-3 text-uppercase text-muted\">Build & Runtime Config</h5><div class=\"row\"><div class=\"col-md-6 mb-3\"><label for=\"build_command\" class=\"form-label\">Build Command</label> <input type=\"text\" class=\"form-control\" id=\"build_command\" name=\"build_command\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(s.BuildCommand)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 42, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 48, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" placeholder=\"e.g. npm run build, go build, or empty\"><div class=\"form-text\">Command to compile or build the service.</div></div><div class=\"col-md-6 mb-3\"><label for=\"run_command\" class=\"form-label\">Run Command</label> <input type=\"text\" class=\"form-control\" id=\"run_command\" name=\"run_command\" required value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"e.g. npm run build, go build, or empty\"><div class=\"form-text\">Command to compile or build the service.</div></div><div class=\"col-md-6 mb-3\"><label for=\"run_command\" class=\"form-label\">Run Command</label> <input type=\"text\" class=\"form-control\" id=\"run_command\" name=\"run_command\" required value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(s.RunCommand)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 48, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 54, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"e.g. npm start, ./main\"><div class=\"form-text\">Command to start the web server.</div></div></div><div class=\"row\"><div class=\"col-md-6 mb-3\"><label for=\"port\" class=\"form-label\">Port</label> <input type=\"number\" class=\"form-control\" id=\"port\" name=\"port\" required value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" placeholder=\"e.g. npm start, ./main\"><div class=\"form-text\">Command to start the web server.</div></div></div><div class=\"row\"><div class=\"col-md-6 mb-3\"><label for=\"port\" class=\"form-label\">Port</label> <input type=\"number\" class=\"form-control\" id=\"port\" name=\"port\" required value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", s.Port))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 56, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 62, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" placeholder=\"e.g. 8080\" min=\"1\" max=\"65535\"><div class=\"form-text\">Network port the web server listens on.</div></div></div></div></div><!-- Environment Variables (with JS parser) --><div class=\"card bg-light mb-4\"><div class=\"card-body\"><h5 class=\"card-title h6 mb-3 text-uppercase text-muted d-flex justify-content-between align-items-center\">Environment Variables <button type=\"button\" class=\"btn btn-sm btn-outline-primary\" onclick=\"addEnvRow('', '')\">+ Add Variable</button></h5><div class=\"row g-2 mb-3 bg-white p-3 border rounded shadow-xs mx-0\"><div class=\"col-sm-8\"><textarea id=\"env-paste\" class=\"form-control form-control-sm\" rows=\"3\" placeholder=\"Paste .env block here (e.g. KEY=VALUE)\"></textarea></div><div class=\"col-sm-4 d-flex flex-column justify-content-between\"><button type=\"button\" class=\"btn btn-sm btn-secondary w-100\" onclick=\"parsePastedEnv()\">Parse Paste</button> <input type=\"file\" id=\"env-file\" class=\"d-none\" onchange=\"uploadEnvFile(this)\" accept=\".env,text/plain\"> <button type=\"button\" class=\"btn btn-sm btn-outline-secondary w-100 mt-2\" onclick=\"document.getElementById('env-file').click()\">Upload File</button></div></div><div id=\"env-vars-rows\"><!-- Dynamic env variables are populated here --></div></div></div><div class=\"d-flex justify-content-between mt-4\"><a href=\"/\" class=\"btn btn-outline-secondary\">Cancel</a> <button type=\"submit\" class=\"btn btn-primary btn-lg\">Save & Deploy</button></div></form></div></div></div></div><!-- Script to handle dynamic fields and parsing --> <script>\n\t\t\tfunction addEnvRow(key, val) {\n\t\t\t\tconst container = document.getElementById('env-vars-rows');\n\t\t\t\tconst rowId = 'row-' + Date.now() + '-' + Math.floor(Math.random()*1000);\n\t\t\t\t\n\t\t\t\tconst rowDiv = document.createElement('div');\n\t\t\t\trowDiv.className = 'row g-2 mb-2 align-items-center';\n\t\t\t\trowDiv.id = rowId;\n\t\t\t\trowDiv.innerHTML = `\n\t\t\t\t\t<div class=\"col-5\">\n\t\t\t\t\t\t<input type=\"text\" name=\"env_keys[]\" class=\"form-control form-control-sm\" value=\"${key}\" placeholder=\"KEY\" required />\n\t\t\t\t\t</div>\n\t\t\t\t\t<div class=\"col-5\">\n\t\t\t\t\t\t<input type=\"text\" name=\"env_vals[]\" class=\"form-control form-control-sm\" value=\"${val}\" placeholder=\"VALUE\" required />\n\t\t\t\t\t</div>\n\t\t\t\t\t<div class=\"col-2 text-end\">\n\t\t\t\t\t\t<button type=\"button\" class=\"btn btn-sm btn-danger w-100\" onclick=\"document.getElementById('${rowId}').remove()\">Remove</button>\n\t\t\t\t\t</div>\n\t\t\t\t`;\n\t\t\t\tcontainer.appendChild(rowDiv);\n\t\t\t}\n\n\t\t\tfunction processEnvText(text) {\n\t\t\t\tconst lines = text.split('\\n');\n\t\t\t\tfor (let line of lines) {\n\t\t\t\t\tline = line.trim();\n\t\t\t\t\tif (!line || line.startsWith('#')) continue;\n\t\t\t\t\tconst parts = line.split('=');\n\t\t\t\t\tif (parts.length >= 2) {\n\t\t\t\t\t\tconst key = parts[0].trim();\n\t\t\t\t\t\tlet val = parts.slice(1).join('=').trim();\n\t\t\t\t\t\t// strip quotes\n\t\t\t\t\t\tif ((val.startsWith('\"') && val.endsWith('\"')) || (val.startsWith(\"'\") && val.endsWith(\"'\"))) {\n\t\t\t\t\t\t\tval = val.slice(1, -1);\n\t\t\t\t\t\t}\n\t\t\t\t\t\taddEnvRow(key, val);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction parsePastedEnv() {\n\t\t\t\tconst textarea = document.getElementById('env-paste');\n\t\t\t\tconst text = textarea.value;\n\t\t\t\tif (text.trim() === '') return;\n\t\t\t\tprocessEnvText(text);\n\t\t\t\ttextarea.value = '';\n\t\t\t}\n\n\t\t\tfunction uploadEnvFile(input) {\n\t\t\t\tconst file = input.files[0];\n\t\t\t\tif (!file) return;\n\t\t\t\tconst reader = new FileReader();\n\t\t\t\treader.onload = function(e) {\n\t\t\t\t\tprocessEnvText(e.target.result);\n\t\t\t\t};\n\t\t\t\treader.readAsText(file);\n\t\t\t\tinput.value = '';\n\t\t\t}\n\n\t\t\t// Render existing variables on load\n\t\t\tdocument.addEventListener('DOMContentLoaded', function() {\n\t\t\t\tconst initialVars = JSON.parse( { getEnvVarsJSON(s.EnvVars) } );\n\t\t\t\tfor (const [key, val] of Object.entries(initialVars)) {\n\t\t\t\t\taddEnvRow(key, val);\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" placeholder=\"e.g. 8080\" min=\"1\" max=\"65535\"><div class=\"form-text\">Network port the web server listens on.</div></div><div class=\"col-md-6 mb-3\"><label for=\"root_directory\" class=\"form-label\">Root Directory</label> <input type=\"text\" class=\"form-control font-monospace\" id=\"root_directory\" name=\"root_directory\" list=\"root_directory_options\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(s.RootDirectory)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 68, Col: 65}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" placeholder=\"e.g. . or apps/api\"> <datalist id=\"root_directory_options\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, dir := range dirs {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<option value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(dir)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 71, Col: 32}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"></option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</datalist><div class=\"form-text\">Choose or type the repository root subdirectory (monorepo support).</div></div></div></div></div><!-- Environment Variables (with JS parser) --><div class=\"card bg-light mb-4\"><div class=\"card-body\"><h5 class=\"card-title h6 mb-3 text-uppercase text-muted d-flex justify-content-between align-items-center\">Environment Variables <button type=\"button\" class=\"btn btn-sm btn-outline-primary\" onclick=\"addEnvRow('', '')\">+ Add Variable</button></h5><div class=\"row g-2 mb-3 bg-white p-3 border rounded shadow-xs mx-0\"><div class=\"col-sm-8\"><textarea id=\"env-paste\" class=\"form-control form-control-sm\" rows=\"3\" placeholder=\"Paste .env block here (e.g. KEY=VALUE)\"></textarea></div><div class=\"col-sm-4 d-flex flex-column justify-content-between\"><button type=\"button\" class=\"btn btn-sm btn-secondary w-100\" onclick=\"parsePastedEnv()\">Parse Paste</button> <input type=\"file\" id=\"env-file\" class=\"d-none\" onchange=\"uploadEnvFile(this)\" accept=\".env,text/plain\"> <button type=\"button\" class=\"btn btn-sm btn-outline-secondary w-100 mt-2\" onclick=\"document.getElementById('env-file').click()\">Upload File</button></div></div><div id=\"env-vars-rows\"><!-- Dynamic env variables are populated here --></div><div id=\"env-vars-data\" data-env-vars=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(getEnvVarsJSON(s.EnvVars))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/services/deploy.templ`, Line: 103, Col: 74}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"d-none\"></div></div></div><div class=\"d-flex justify-content-between mt-4\"><a href=\"/\" class=\"btn btn-outline-secondary\">Cancel</a> <button type=\"submit\" class=\"btn btn-primary btn-lg\">Save & Deploy</button></div></form></div></div></div></div><!-- Script to handle dynamic fields and parsing --> <script>\n\t\t\tfunction addEnvRow(key, val) {\n\t\t\t\tconst container = document.getElementById('env-vars-rows');\n\t\t\t\tconst rowId = 'row-' + Date.now() + '-' + Math.floor(Math.random()*1000);\n\t\t\t\t\n\t\t\t\tconst rowDiv = document.createElement('div');\n\t\t\t\trowDiv.className = 'row g-2 mb-2 align-items-center';\n\t\t\t\trowDiv.id = rowId;\n\t\t\t\trowDiv.innerHTML = `\n\t\t\t\t\t<div class=\"col-5\">\n\t\t\t\t\t\t<input type=\"text\" name=\"env_keys[]\" class=\"form-control form-control-sm\" value=\"${key}\" placeholder=\"KEY\" required />\n\t\t\t\t\t</div>\n\t\t\t\t\t<div class=\"col-5\">\n\t\t\t\t\t\t<input type=\"text\" name=\"env_vals[]\" class=\"form-control form-control-sm\" value=\"${val}\" placeholder=\"VALUE\" required />\n\t\t\t\t\t</div>\n\t\t\t\t\t<div class=\"col-2 text-end\">\n\t\t\t\t\t\t<button type=\"button\" class=\"btn btn-sm btn-danger w-100\" onclick=\"document.getElementById('${rowId}').remove()\">Remove</button>\n\t\t\t\t\t</div>\n\t\t\t\t`;\n\t\t\t\tcontainer.appendChild(rowDiv);\n\t\t\t}\n\n\t\t\tfunction processEnvText(text) {\n\t\t\t\tconst lines = text.split('\\n');\n\t\t\t\tfor (let line of lines) {\n\t\t\t\t\tline = line.trim();\n\t\t\t\t\tif (!line || line.startsWith('#')) continue;\n\t\t\t\t\tconst parts = line.split('=');\n\t\t\t\t\tif (parts.length >= 2) {\n\t\t\t\t\t\tconst key = parts[0].trim();\n\t\t\t\t\t\tlet val = parts.slice(1).join('=').trim();\n\t\t\t\t\t\t// strip quotes\n\t\t\t\t\t\tif ((val.startsWith('\"') && val.endsWith('\"')) || (val.startsWith(\"'\") && val.endsWith(\"'\"))) {\n\t\t\t\t\t\t\tval = val.slice(1, -1);\n\t\t\t\t\t\t}\n\t\t\t\t\t\taddEnvRow(key, val);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction parsePastedEnv() {\n\t\t\t\tconst textarea = document.getElementById('env-paste');\n\t\t\t\tconst text = textarea.value;\n\t\t\t\tif (text.trim() === '') return;\n\t\t\t\tprocessEnvText(text);\n\t\t\t\ttextarea.value = '';\n\t\t\t}\n\n\t\t\tfunction uploadEnvFile(input) {\n\t\t\t\tconst file = input.files[0];\n\t\t\t\tif (!file) return;\n\t\t\t\tconst reader = new FileReader();\n\t\t\t\treader.onload = function(e) {\n\t\t\t\t\tprocessEnvText(e.target.result);\n\t\t\t\t};\n\t\t\t\treader.readAsText(file);\n\t\t\t\tinput.value = '';\n\t\t\t}\n\n\t\t\t// Render existing variables on load\n\t\t\tdocument.addEventListener('DOMContentLoaded', function() {\n\t\t\t\tconst dataEl = document.getElementById('env-vars-data');\n\t\t\t\tconst initialVars = JSON.parse(dataEl ? dataEl.getAttribute('data-env-vars') : '{}');\n\t\t\t\tfor (const [key, val] of Object.entries(initialVars)) {\n\t\t\t\t\taddEnvRow(key, val);\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

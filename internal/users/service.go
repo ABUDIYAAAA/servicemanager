@@ -235,24 +235,33 @@ func (s *UserService) IsGithubInstalled(ctx context.Context, userID int) (bool, 
 	return inst != nil, nil
 }
 
+func (s *UserService) GetAllGithubInstallations(ctx context.Context, userID int) ([]models.GithubInstallation, error) {
+	return s.repository.GetAllGithubInstallationsByUserID(ctx, userID)
+}
+
 func (s *UserService) GetGithubRepositories(ctx context.Context, userID int) ([]models.GithubRepo, error) {
-	inst, err := s.repository.GetGithubInstallationByUserID(ctx, userID)
+	installations, err := s.repository.GetAllGithubInstallationsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if inst == nil {
+	if len(installations) == 0 {
 		return nil, fmt.Errorf("github app not installed for this user")
 	}
 
-	repos, err := utils.GetInstallationRepositories(s.githubAppID, s.githubPrivateKey, inst.InstallationID)
-	if err != nil {
-		return nil, err
+	var allRepos []models.GithubRepo
+	for _, inst := range installations {
+		repos, err := utils.GetInstallationRepositories(s.githubAppID, s.githubPrivateKey, inst.InstallationID)
+		if err != nil {
+			// Log error and continue to fetch from other installations
+			continue
+		}
+		allRepos = append(allRepos, repos...)
 	}
 
 	// Sort by pushed_at descending (most recent pushed first)
-	sort.Slice(repos, func(i, j int) bool {
-		return repos[i].PushedAt.After(repos[j].PushedAt)
+	sort.Slice(allRepos, func(i, j int) bool {
+		return allRepos[i].PushedAt.After(allRepos[j].PushedAt)
 	})
 
-	return repos, nil
+	return allRepos, nil
 }

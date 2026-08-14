@@ -313,6 +313,9 @@ func (r *UserRepository) GetAllInvites(ctx context.Context) ([]models.Invite, er
 }
 
 func (r *UserRepository) SaveGithubInstallation(ctx context.Context, userID int, installationID int64, accountID int64, accountLogin string) error {
+	// Delete any previous installations for this account to prevent stale records
+	_, _ = r.pool.Exec(ctx, "DELETE FROM github_installations WHERE account_login = $1", accountLogin)
+
 	query := `INSERT INTO github_installations (user_id, installation_id, account_id, account_login) 
 	          VALUES ($1, $2, $3, $4) 
 	          ON CONFLICT (installation_id) 
@@ -341,6 +344,34 @@ func (r *UserRepository) GetGithubInstallationByUserID(ctx context.Context, user
 		return nil, err
 	}
 	return &inst, nil
+}
+
+func (r *UserRepository) GetAllGithubInstallationsByUserID(ctx context.Context, userID int) ([]models.GithubInstallation, error) {
+	query := `SELECT id, user_id, installation_id, account_id, account_login, created_at 
+	          FROM github_installations WHERE user_id = $1`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var installations []models.GithubInstallation
+	for rows.Next() {
+		var inst models.GithubInstallation
+		if err := rows.Scan(
+			&inst.ID,
+			&inst.UserID,
+			&inst.InstallationID,
+			&inst.AccountID,
+			&inst.AccountLogin,
+			&inst.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		installations = append(installations, inst)
+	}
+	return installations, nil
 }
 
 func (r *UserRepository) DeleteGithubInstallation(ctx context.Context, userID int) error {

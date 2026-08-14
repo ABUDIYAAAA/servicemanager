@@ -30,6 +30,10 @@ type Env struct {
 	INFISICAL_URL           string
 	INFISICAL_CLIENT_ID     string
 	INFISICAL_CLIENT_SECRET string
+	MONGO_DB_URL            string
+	SERVICES_ROOT_DIR       string
+	REDIS_URI               string
+	GITHUB_WEBHOOK_SECRET   string
 }
 
 func LoadEnv() (*Env, error) {
@@ -68,5 +72,9 @@ func LoadEnv() (*Env, error) {
 		INFISICAL_URL:           os.Getenv("INFISICAL_URL"),
 		INFISICAL_CLIENT_ID:     os.Getenv("INFISICAL_CLIENT_ID"),
 		INFISICAL_CLIENT_SECRET: os.Getenv("INFISICAL_CLIENT_SECRET"),
+		MONGO_DB_URL:            os.Getenv("MONGO_DB_URL"),
+		SERVICES_ROOT_DIR:       os.Getenv("SERVICES_ROOT_DIR"),
+		REDIS_URI:               os.Getenv("REDIS_URI"),
+		GITHUB_WEBHOOK_SECRET:   os.Getenv("GITHUB_WEBHOOK_SECRET"),
 	}, nil
 }

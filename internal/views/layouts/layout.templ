@@ -1,5 +1,9 @@
 package layouts
 
+import (
+	"servicemanager/internal/views/components"
+)
+
 templ Layout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -12,6 +16,11 @@ templ Layout(title string) {
 			<style>
 				body { background-color: #f8f9fa; }
 				.tab-content { padding-top: 20px; }
+				
+				/* Styling for custom dropdown selections */
+				.custom-dropdown-option:hover {
+					background-color: #e9ecef;
+				}
 			</style>
 		</head>
 		<body>
@@ -38,6 +47,7 @@ templ Layout(title string) {
 					});
 				});
 			</script>
+			@components.DropdownScript()
 		</body>
 	</html>
 }

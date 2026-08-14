@@ -6,7 +6,7 @@ import (
 	"servicemanager/internal/views/layouts"
 )
 
-templ Details(s models.Service) {
+templ Details(s models.Service, u models.User, d *models.Deployment) {
 	@layouts.Layout("Service Details - " + s.Name) {
 		<!-- Header -->
 		<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
@@ -26,9 +26,14 @@ templ Details(s models.Service) {
 					<span class="badge bg-success align-middle">{ s.Status }</span>
 				}
 			</div>
-			<div>
-				<a href={ templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)) } class="btn btn-outline-primary">Edit Configuration</a>
-			</div>
+			if u.UserRole == models.RoleAdmin {
+				<div class="d-flex gap-2">
+					<form action={ templ.SafeURL(fmt.Sprintf("/services/%d/redeploy", s.ID)) } method="POST" class="m-0">
+						<button type="submit" class="btn btn-primary">Redeploy</button>
+					</form>
+					<a href={ templ.SafeURL(fmt.Sprintf("/services/%d/deploy", s.ID)) } class="btn btn-outline-primary">Edit Configuration</a>
+				</div>
+			}
 		</div>
 
 		<!-- Tabs Nav -->
@@ -38,9 +43,6 @@ templ Details(s models.Service) {
 			</li>
 			<li class="nav-item" role="presentation">
 				<button class="nav-link" id="envs-tab" data-bs-toggle="tab" data-bs-target="#envs" type="button" role="tab" aria-controls="envs" aria-selected="false">Environment Variables</button>
-			</li>
-			<li class="nav-item" role="presentation">
-				<button class="nav-link" id="infisical-tab" data-bs-toggle="tab" data-bs-target="#infisical" type="button" role="tab" aria-controls="infisical" aria-selected="false">Infisical Settings</button>
 			</li>
 			<li class="nav-item" role="presentation">
 				<button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">Logs</button>
@@ -61,6 +63,10 @@ templ Details(s models.Service) {
 										<tr>
 											<th class="ps-0" style="width: 40%;">Directory Path:</th>
 											<td><code>{ s.DirectoryPath }</code></td>
+										</tr>
+										<tr>
+											<th class="ps-0">Root Directory:</th>
+											<td><code>{ s.RootDirectory }</code></td>
 										</tr>
 										<tr>
 											<th class="ps-0">Port:</th>
@@ -144,105 +150,128 @@ templ Details(s models.Service) {
 			<div class="tab-pane fade" id="envs" role="tabpanel" aria-labelledby="envs-tab">
 				<div class="card shadow-sm">
 					<div class="card-body">
-						<h5 class="card-title h6 text-uppercase text-muted mb-3">Active Environment Variables</h5>
-						if len(s.EnvVars) == 0 {
-							<p class="text-muted my-3 text-center">No environment variables configured.</p>
-						} else {
-							<div class="table-responsive">
-								<table class="table table-striped align-middle mb-0">
-									<thead>
-										<tr>
-											<th style="width: 40%;">Variable Key</th>
-											<th>Value</th>
-										</tr>
-									</thead>
-									<tbody>
-										for k, v := range s.EnvVars {
-											<tr>
-												<td><code>{ k }</code></td>
-												<td><code>{ v }</code></td>
-											</tr>
-										}
-									</tbody>
-								</table>
+						if u.UserRole == models.RoleAdmin {
+							<div class="d-flex justify-content-between align-items-center mb-3">
+								<h5 class="card-title h6 text-uppercase text-muted mb-0">Manage Environment Variables</h5>
+								<button type="button" class="btn btn-sm btn-outline-primary" onclick="addEnvRow('', '')">+ Add Variable</button>
 							</div>
-						}
-					</div>
-				</div>
-			</div>
 
-			<!-- Infisical Settings Tab -->
-			<div class="tab-pane fade" id="infisical" role="tabpanel" aria-labelledby="infisical-tab">
-				<div class="card shadow-sm">
-					<div class="card-body">
-						<h5 class="card-title h6 text-uppercase text-muted mb-3">Infisical Integration Details</h5>
-						<p class="text-muted small">Secrets are managed automatically by the system using the organization's global Infisical Universal Auth credentials.</p>
-						<table class="table table-borderless align-middle mb-0">
-							<tbody>
-								<tr>
-									<th style="width: 25%;">Workspace / Project ID:</th>
-									<td>
-										if s.InfisicalWorkspaceID != "" {
-											<code>{ s.InfisicalWorkspaceID }</code>
-										} else {
-											<span class="text-muted">Auto-assigned upon sync</span>
-										}
-									</td>
-								</tr>
-								<tr>
-									<th>Sync Environment:</th>
-									<td>
-										if s.InfisicalEnv != "" {
-											<span class="badge bg-secondary">{ s.InfisicalEnv }</span>
-										} else {
-											<span class="badge bg-secondary">dev</span>
-										}
-									</td>
-								</tr>
-								<tr>
-									<th>Sync Status:</th>
-									<td>
-										if s.Status == "deploying" || s.Status == "active" {
-											<span class="text-success">● Connected & Synced</span>
-										} else {
-											<span class="text-muted">○ Pending Deployment</span>
-										}
-									</td>
-								</tr>
-							</tbody>
-						</table>
+							<div class="row g-2 mb-3 bg-light p-3 border rounded mx-0">
+								<div class="col-sm-8">
+									<textarea id="env-paste" class="form-control form-control-sm" rows="2" placeholder="Paste .env block here (e.g. KEY=VALUE)"></textarea>
+								</div>
+								<div class="col-sm-4 d-flex align-items-center">
+									<button type="button" class="btn btn-sm btn-secondary w-100" onclick="parsePastedEnv()">Parse Paste</button>
+								</div>
+							</div>
+
+							<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/services/%d/envs", s.ID)) }>
+								<div id="env-vars-rows">
+									<!-- Dynamic rows populated by JS -->
+								</div>
+								<div id="env-vars-data" data-env-vars={ getEnvVarsJSON(s.EnvVars) } class="d-none"></div>
+
+								<div class="text-end mt-4 pt-3 border-top">
+									<button type="submit" class="btn btn-primary">Save Changes</button>
+								</div>
+							</form>
+						} else {
+							<h5 class="card-title h6 text-uppercase text-muted mb-3">Active Environment Variables</h5>
+							if len(s.EnvVars) == 0 {
+								<p class="text-muted my-3 text-center">No environment variables configured.</p>
+							} else {
+								<div class="table-responsive">
+									<table class="table table-striped align-middle mb-0">
+										<thead>
+											<tr>
+												<th style="width: 40%;">Variable Key</th>
+												<th>Value</th>
+											</tr>
+										</thead>
+										<tbody>
+											for k, v := range s.EnvVars {
+												<tr>
+													<td><code>{ k }</code></td>
+													<td>
+														<div class="d-flex align-items-center justify-content-between">
+															<code class="me-3 font-monospace" id={ fmt.Sprintf("row-ro-%d", s.ID) + k } data-value={ v }>••••••••</code>
+															<button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 11px;" { templ.Attributes{"onclick": fmt.Sprintf("toggleReadOnlyValue(this, 'row-ro-%d%s')", s.ID, k)}... }>Show</button>
+														</div>
+													</td>
+												</tr>
+											}
+										</tbody>
+									</table>
+								</div>
+							}
+						}
 					</div>
 				</div>
 			</div>
 
 			<!-- Logs Tab -->
 			<div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
-				<div class="row">
-					<div class="col-md-6 mb-4">
-						<div class="card shadow-sm">
-							<div class="card-body">
-								<h5 class="card-title h6 text-uppercase text-muted mb-3">Build Logs</h5>
-								<div class="p-3 bg-dark text-white rounded font-monospace" style="height: 350px; overflow-y: auto;">
-									if s.BuildLogs != "" {
-										<pre class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">{ s.BuildLogs }</pre>
-									} else {
-										<span class="text-muted small">No build logs available. Build has not run yet.</span>
-									}
-								</div>
-							</div>
+				if d != nil {
+					<div class="alert alert-light border d-flex align-items-center justify-content-between mb-3" role="alert">
+						<div>
+							<strong>Deployment #{ fmt.Sprintf("%d", d.ID) }</strong>
+							<span class="ms-2 badge bg-secondary">{ d.Trigger }</span>
+							if d.CommitSHA != "" {
+								<code class="ms-2">{ d.CommitSHA[:8] }</code>
+							}
+						</div>
+						<div>
+							if d.Status == "building" {
+								<span class="badge bg-warning text-dark">Building</span>
+							} else if d.Status == "running" {
+								<span class="badge bg-success">Running</span>
+							} else if d.Status == "queued" {
+								<span class="badge bg-info text-dark">Queued</span>
+							} else if d.Status == "failed" {
+								<span class="badge bg-danger">Failed</span>
+							} else {
+								<span class="badge bg-secondary">{ d.Status }</span>
+							}
+							<small class="text-muted ms-2">{ d.CreatedAt.Format("2006-01-02 15:04:05") }</small>
 						</div>
 					</div>
-
-					<div class="col-md-6 mb-4">
-						<div class="card shadow-sm">
-							<div class="card-body">
-								<h5 class="card-title h6 text-uppercase text-muted mb-3">Runtime Logs</h5>
-								<div class="p-3 bg-dark text-white rounded font-monospace" style="height: 350px; overflow-y: auto;">
-									if s.RuntimeLogs != "" {
-										<pre class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">{ s.RuntimeLogs }</pre>
-									} else {
-										<span class="text-muted small">No runtime logs available. Server has not started.</span>
-									}
+				}
+				<div class="card shadow-sm">
+					<div class="card-header bg-light">
+						<ul class="nav nav-pills card-header-pills" id="logSubTabs" role="tablist">
+							<li class="nav-item" role="presentation">
+								<button class="nav-link active btn-sm" id="build-logs-tab" data-bs-toggle="pill" data-bs-target="#build-logs-pane" type="button" role="tab" aria-controls="build-logs-pane" aria-selected="true">Build Logs</button>
+							</li>
+							<li class="nav-item ms-2" role="presentation">
+								<button class="nav-link btn-sm" id="runtime-logs-tab" data-bs-toggle="pill" data-bs-target="#runtime-logs-pane" type="button" role="tab" aria-controls="runtime-logs-pane" aria-selected="false">Runtime Logs</button>
+							</li>
+						</ul>
+					</div>
+					<div class="card-body p-0">
+						<div class="tab-content" id="logSubTabsContent">
+							<!-- Build Logs Pane -->
+							<div class="tab-pane fade show active" id="build-logs-pane" role="tabpanel" aria-labelledby="build-logs-tab">
+								<div id="build-logs-container" class="p-3 bg-dark text-white rounded-bottom font-monospace" style="height: 450px; overflow-y: auto;">
+									<pre id="build-logs-output" class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">
+										if d != nil && d.BuildLogs != "" {
+											{ d.BuildLogs }
+										} else {
+											No build logs available. Build has not run yet.
+										}
+									</pre>
+								</div>
+							</div>
+							
+							<!-- Runtime Logs Pane -->
+							<div class="tab-pane fade" id="runtime-logs-pane" role="tabpanel" aria-labelledby="runtime-logs-tab">
+								<div id="runtime-logs-container" class="p-3 bg-dark text-white rounded-bottom font-monospace" style="height: 450px; overflow-y: auto;">
+									<pre id="runtime-logs-output" class="mb-0 text-white" style="white-space: pre-wrap; font-size: 13px;">
+										if d != nil && d.RuntimeLogs != "" {
+											{ d.RuntimeLogs }
+										} else {
+											No runtime logs available. Server has not started.
+										}
+									</pre>
 								</div>
 							</div>
 						</div>
@@ -253,7 +282,98 @@ templ Details(s models.Service) {
 
 		<!-- Script to load target tab on page refresh -->
 		<script>
+			// Javascript helpers for Env variable toggling and additions
+			function toggleEnvVisibility(button, inputId) {
+				const input = document.getElementById(inputId);
+				if (!input) return;
+				if (input.type === "password") {
+					input.type = "text";
+					button.textContent = "Hide";
+					button.className = "btn btn-outline-secondary";
+				} else {
+					input.type = "password";
+					button.textContent = "Show";
+					button.className = "btn btn-outline-primary";
+				}
+			}
+
+			function toggleReadOnlyValue(button, elementId) {
+				const el = document.getElementById(elementId);
+				if (!el) return;
+				const realValue = el.getAttribute("data-value");
+				if (el.textContent === "••••••••") {
+					el.textContent = realValue;
+					button.textContent = "Hide";
+					button.className = "btn btn-xs btn-outline-secondary py-0 px-2";
+				} else {
+					el.textContent = "••••••••";
+					button.textContent = "Show";
+					button.className = "btn btn-xs btn-outline-primary py-0 px-2";
+				}
+			}
+
+			function addEnvRow(key, val) {
+				const container = document.getElementById('env-vars-rows');
+				if (!container) return;
+				const rowId = 'row-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+				const inputId = 'input-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+				
+				const rowDiv = document.createElement('div');
+				rowDiv.className = 'row g-2 mb-2 align-items-center';
+				rowDiv.id = rowId;
+				rowDiv.innerHTML = `
+					<div class="col-4">
+						<input type="text" name="env_keys[]" class="form-control form-control-sm" value="${key}" placeholder="KEY" required />
+					</div>
+					<div class="col-5">
+						<div class="input-group input-group-sm">
+							<input type="password" id="${inputId}" name="env_vals[]" class="form-control" value="${val}" placeholder="VALUE" required />
+							<button class="btn btn-outline-primary" type="button" onclick="toggleEnvVisibility(this, '${inputId}')">Show</button>
+						</div>
+					</div>
+					<div class="col-3 text-end">
+						<button type="button" class="btn btn-sm btn-danger w-100" onclick="document.getElementById('${rowId}').remove()">Remove</button>
+					</div>
+				`;
+				container.appendChild(rowDiv);
+			}
+
+			function processEnvText(text) {
+				const lines = text.split('\n');
+				for (let line of lines) {
+					line = line.trim();
+					if (!line || line.startsWith('#')) continue;
+					const parts = line.split('=');
+					if (parts.length >= 2) {
+						const key = parts[0].trim();
+						let val = parts.slice(1).join('=').trim();
+						if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+							val = val.slice(1, -1);
+						}
+						addEnvRow(key, val);
+					}
+				}
+			}
+
+			function parsePastedEnv() {
+				const textarea = document.getElementById('env-paste');
+				if (!textarea) return;
+				const text = textarea.value;
+				if (text.trim() === '') return;
+				processEnvText(text);
+				textarea.value = '';
+			}
+
 			document.addEventListener("DOMContentLoaded", function() {
+				// Populate initial variables for admin form
+				const dataEl = document.getElementById('env-vars-data');
+				if (dataEl) {
+					const initialVars = JSON.parse(dataEl.getAttribute('data-env-vars') || '{}');
+					for (const [key, val] of Object.entries(initialVars)) {
+						addEnvRow(key, val);
+					}
+				}
+
 				var hash = window.location.hash;
 				if (hash) {
 					var tabElement = document.querySelector('button[data-bs-target="' + hash + '"]');
@@ -263,7 +383,6 @@ templ Details(s models.Service) {
 					}
 				}
 
-				// Update URL hash when a tab changes
 				var tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
 				tabEls.forEach(function(el) {
 					el.addEventListener('shown.bs.tab', function(e) {
@@ -275,6 +394,52 @@ templ Details(s models.Service) {
 						}
 					});
 				});
+
+				let logsSource;
+				const buildLogsOutput = document.getElementById("build-logs-output");
+				const runtimeLogsOutput = document.getElementById("runtime-logs-output");
+
+				function connectServiceLogs() {
+					logsSource = new EventSource("/api/v1/services/" + { fmt.Sprintf("%d", s.ID) } + "/logs/stream");
+
+					logsSource.onmessage = function(event) {
+						try {
+							const data = JSON.parse(event.data);
+							if (data.type === "build") {
+								if (buildLogsOutput.textContent.includes("No build logs available")) {
+									buildLogsOutput.textContent = "";
+								}
+								buildLogsOutput.textContent += data.log + "\n";
+								const container = document.getElementById("build-logs-container");
+								if (container) container.scrollTop = container.scrollHeight;
+							} else if (data.type === "runtime") {
+								if (runtimeLogsOutput.textContent.includes("No runtime logs available")) {
+									runtimeLogsOutput.textContent = "";
+								}
+								runtimeLogsOutput.textContent += data.log + "\n";
+								const container = document.getElementById("runtime-logs-container");
+								if (container) container.scrollTop = container.scrollHeight;
+							}
+						} catch (e) {
+							console.error(e);
+						}
+					};
+
+					logsSource.onerror = function() {
+						logsSource.close();
+						logsSource = null;
+						setTimeout(connectServiceLogs, 3000);
+					};
+				}
+
+				const logsTabEl = document.getElementById('logs-tab');
+				if (logsTabEl) {
+					logsTabEl.addEventListener('shown.bs.tab', function () {
+						if (!logsSource) {
+							connectServiceLogs();
+						}
+					});
+				}
 			});
 		</script>
 	}

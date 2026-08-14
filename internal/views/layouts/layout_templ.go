@@ -8,6 +8,10 @@ package layouts
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import (
+	"servicemanager/internal/views/components"
+)
+
 func Layout(title string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -36,13 +40,13 @@ func Layout(title string) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layouts/layout.templ`, Line: 9, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layouts/layout.templ`, Line: 13, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\"><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><style>\n\t\t\t\tbody { background-color: #f8f9fa; }\n\t\t\t\t.tab-content { padding-top: 20px; }\n\t\t\t</style></head><body><div class=\"container py-5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\"><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><style>\n\t\t\t\tbody { background-color: #f8f9fa; }\n\t\t\t\t.tab-content { padding-top: 20px; }\n\t\t\t\t\n\t\t\t\t/* Styling for custom dropdown selections */\n\t\t\t\t.custom-dropdown-option:hover {\n\t\t\t\t\tbackground-color: #e9ecef;\n\t\t\t\t}\n\t\t\t</style></head><body><div class=\"container py-5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,7 +54,15 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/sweetalert2@11\"></script><script>\n\t\t\t\tdocument.addEventListener(\"htmx:confirm\", function(e) {\n\t\t\t\t\te.preventDefault();\n\t\t\t\t\tSwal.fire({\n\t\t\t\t\t\ttitle: \"Are you sure?\",\n\t\t\t\t\t\ttext: e.detail.question,\n\t\t\t\t\t\ticon: \"warning\",\n\t\t\t\t\t\tshowCancelButton: true,\n\t\t\t\t\t\tconfirmButtonColor: \"#dc3545\",\n\t\t\t\t\t\tcancelButtonColor: \"#6c757d\",\n\t\t\t\t\t\tconfirmButtonText: \"Yes, proceed!\"\n\t\t\t\t\t}).then(function(result) {\n\t\t\t\t\t\tif (result.isConfirmed) {\n\t\t\t\t\t\t\te.detail.issueRequest(true); // true means skip window.confirm\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/sweetalert2@11\"></script><script>\n\t\t\t\tdocument.addEventListener(\"htmx:confirm\", function(e) {\n\t\t\t\t\te.preventDefault();\n\t\t\t\t\tSwal.fire({\n\t\t\t\t\t\ttitle: \"Are you sure?\",\n\t\t\t\t\t\ttext: e.detail.question,\n\t\t\t\t\t\ticon: \"warning\",\n\t\t\t\t\t\tshowCancelButton: true,\n\t\t\t\t\t\tconfirmButtonColor: \"#dc3545\",\n\t\t\t\t\t\tcancelButtonColor: \"#6c757d\",\n\t\t\t\t\t\tconfirmButtonText: \"Yes, proceed!\"\n\t\t\t\t\t}).then(function(result) {\n\t\t\t\t\t\tif (result.isConfirmed) {\n\t\t\t\t\t\t\te.detail.issueRequest(true); // true means skip window.confirm\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t</script>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.DropdownScript().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
