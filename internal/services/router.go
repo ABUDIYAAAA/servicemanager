@@ -23,6 +23,7 @@ func ServiceRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 
 	// Read routes (authenticated users can read)
 	mux.Handle("GET /", authMw(http.HandlerFunc(handler.GetAllServices)))
+	mux.Handle("GET /{id}/logs/stream", authMw(http.HandlerFunc(handler.HandleServiceLogsStream)))
 
 	// Write routes (admins only)
 	mux.Handle("POST /", adminOnly(http.HandlerFunc(handler.CreateService)))

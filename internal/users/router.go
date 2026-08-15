@@ -33,14 +33,15 @@ func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 	mux.Handle("GET /me", authMw(http.HandlerFunc(userHandler.GetMe)))
 	mux.Handle("POST /github/installations", authMw(http.HandlerFunc(userHandler.InstallGithub)))
 	mux.Handle("GET /github/repos", authMw(http.HandlerFunc(userHandler.GetGithubRepositories)))
+	mux.Handle("GET /github/url", authMw(http.HandlerFunc(userHandler.GetGithubURL)))
+	mux.Handle("GET /", authMw(http.HandlerFunc(userHandler.GetAllUsers)))
+	mux.Handle("GET /invites", authMw(http.HandlerFunc(userHandler.GetAllInvites)))
 
 	// Admin Only Routes
-	mux.Handle("GET /", adminOnly(http.HandlerFunc(userHandler.GetAllUsers)))
 	mux.Handle("DELETE /{id}", adminOnly(http.HandlerFunc(userHandler.RemoveUser)))
 	mux.Handle("PATCH /{id}/role", adminOnly(http.HandlerFunc(userHandler.ChangeUserRole)))
 	mux.Handle("POST /invite", adminOnly(http.HandlerFunc(userHandler.CreateNewInvite)))
-	mux.Handle("GET /invites", adminOnly(http.HandlerFunc(userHandler.GetAllInvites)))
-	mux.Handle("DELETE /invite/{token}", adminOnly(http.HandlerFunc(userHandler.DeleteInvite)))
+	mux.Handle("DELETE /invite/{email}", adminOnly(http.HandlerFunc(userHandler.DeleteInvite)))
 
 	return mux
 }

@@ -131,12 +131,34 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set HttpOnly cookie for the token
+	http.SetCookie(w, &http.Cookie{
+		Name:  "token",
+		Value: res.Token,
+
+		MaxAge:   365 * 24 * 3600, // 1 year expiry
+		HttpOnly: true,
+		Secure:   false, // Set to true if running over HTTPS
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear Token field from JSON response body
+	res.Token = ""
+
 	utils.JsonResponse(w, http.StatusOK, res)
 }
 
 func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// JWT is stateless; client should drop token. 
-	// We return status OK.
+	// Revoke the HttpOnly token cookie by setting MaxAge to -1
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 	utils.JsonResponse(w, http.StatusOK, map[string]string{"message": "logged out successfully"})
 }
 
@@ -164,7 +186,6 @@ func (h *UserHandler) CreateNewInvite(w http.ResponseWriter, r *http.Request) {
 	res := InviteResponsePayload{
 		ID:        invite.ID,
 		Email:     invite.Email,
-		Token:     invite.Token,
 		CreatedAt: invite.CreatedAt,
 	}
 
@@ -184,7 +205,6 @@ func (h *UserHandler) GetAllInvites(w http.ResponseWriter, r *http.Request) {
 		res = append(res, InviteResponsePayload{
 			ID:        inv.ID,
 			Email:     inv.Email,
-			Token:     inv.Token,
 			CreatedAt: inv.CreatedAt,
 		})
 	}
@@ -194,13 +214,13 @@ func (h *UserHandler) GetAllInvites(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	token := r.PathValue("token")
-	if token == "" {
-		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("token is required"))
+	email := r.PathValue("email")
+	if email == "" {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("email is required"))
 		return
 	}
 
-	err := h.service.DeleteInvite(ctx, token)
+	err := h.service.DeleteInviteByEmail(ctx, email)
 	if err != nil {
 		if err == ErrInviteNotFound {
 			utils.ErrorResponse(w, http.StatusNotFound, err)
@@ -358,4 +378,14 @@ func (h *UserHandler) GetGithubRepositories(w http.ResponseWriter, r *http.Reque
 	}
 
 	utils.JsonResponse(w, http.StatusOK, repos)
+}
+
+func (h *UserHandler) GetGithubURL(w http.ResponseWriter, r *http.Request) {
+	url, err := h.service.GetGithubInstallURL()
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, map[string]string{"url": url})
 }

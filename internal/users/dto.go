@@ -10,7 +10,7 @@ type LoginRequestPayload struct {
 }
 
 type LoginResponsePayload struct {
-	Token string              `json:"token"`
+	Token string              `json:"token,omitempty"`
 	User  UserResponsePayload `json:"user"`
 }
 
@@ -48,7 +48,6 @@ type UserResponsePayload struct {
 type InviteResponsePayload struct {
 	ID        int       `json:"id"`
 	Email     string    `json:"email"`
-	Token     string    `json:"token"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

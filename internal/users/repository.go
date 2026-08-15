@@ -285,6 +285,18 @@ func (r *UserRepository) DeleteInvite(ctx context.Context, token string) error {
 	return nil
 }
 
+func (r *UserRepository) DeleteInviteByEmail(ctx context.Context, email string) error {
+	query := "DELETE FROM invites WHERE email = $1"
+	cmdTag, err := r.pool.Exec(ctx, query, email)
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrInviteNotFound
+	}
+	return nil
+}
+
 func (r *UserRepository) GetAllInvites(ctx context.Context) ([]models.Invite, error) {
 	var invites []models.Invite
 

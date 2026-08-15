@@ -7,11 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/hibiken/asynq"
-)
-
-const (
-	TypeServiceDeploy = "service:deploy"
-	QueueDeployments  = "deployments"
+	"servicemanager/internal/tasks"
 )
 
 type DeployPayload struct {
@@ -31,7 +27,7 @@ func NewDeployTask(serviceID, deploymentID, userID int) (*asynq.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asynq.NewTask(TypeServiceDeploy, payload, asynq.Queue(QueueDeployments), asynq.MaxRetry(0)), nil
+	return asynq.NewTask(tasks.TypeServiceDeploy, payload, asynq.Queue(tasks.QueueDeployments), asynq.MaxRetry(0)), nil
 }
 
 // DeployHandler is the function signature that the queue worker calls to execute a deployment.
@@ -87,7 +83,7 @@ func NewAsynqServer(redisURI string) *asynq.Server {
 	return asynq.NewServer(opt, asynq.Config{
 		Concurrency: 1,
 		Queues: map[string]int{
-			QueueDeployments: 1,
+			tasks.QueueDeployments: 1,
 		},
 		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
 			slog.Error("Asynq task failed",
@@ -101,6 +97,6 @@ func NewAsynqServer(redisURI string) *asynq.Server {
 // NewAsynqMux creates a new Asynq ServeMux and registers the deploy task handler.
 func NewAsynqMux() *asynq.ServeMux {
 	mux := asynq.NewServeMux()
-	mux.HandleFunc(TypeServiceDeploy, HandleDeployTask)
+	mux.HandleFunc(tasks.TypeServiceDeploy, HandleDeployTask)
 	return mux
 }

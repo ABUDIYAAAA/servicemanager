@@ -123,6 +123,10 @@ func (s *UserService) DeleteInvite(ctx context.Context, token string) error {
 	return s.repository.DeleteInvite(ctx, token)
 }
 
+func (s *UserService) DeleteInviteByEmail(ctx context.Context, email string) error {
+	return s.repository.DeleteInviteByEmail(ctx, email)
+}
+
 func (s *UserService) AcceptInvite(ctx context.Context, token, email, password string) (*models.User, error) {
 	invite, err := s.repository.GetInviteByToken(ctx, token)
 	if err != nil {
@@ -264,4 +268,12 @@ func (s *UserService) GetGithubRepositories(ctx context.Context, userID int) ([]
 	})
 
 	return allRepos, nil
+}
+
+func (s *UserService) GetGithubInstallURL() (string, error) {
+	url, err := utils.GetAppURL(s.githubAppID, s.githubPrivateKey)
+	if err != nil {
+		return "https://github.com/apps/YOUR_APP_NAME/installations/new", nil
+	}
+	return url, nil
 }

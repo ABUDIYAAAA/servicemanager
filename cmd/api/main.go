@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	migrations "servicemanager/cmd/migrate"
@@ -56,25 +59,35 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Start Asynq worker in a goroutine for processing deployment tasks
-	if env.REDIS_URI != "" {
-		go func() {
-			srv := queue.NewAsynqServer(env.REDIS_URI)
-			mux := queue.NewAsynqMux()
-			slog.Info("Starting Asynq deployment queue worker...", slog.String("redis", env.REDIS_URI))
-			if err := srv.Run(mux); err != nil {
-				slog.Error("Asynq worker failed", slog.Any("error", err))
-			}
-		}()
-	} else {
-		slog.Warn("REDIS_URI not configured; deployment queue worker will not start")
-	}
+	shutdownAsynq := queue.StartWorker(env.REDIS_URI)
 
 	router := router.Router(pool, env)
 
-	slog.Info("Starting server...", slog.String("port", env.PORT))
-	err = http.ListenAndServe(fmt.Sprintf(":%s", env.PORT), router)
-	if err != nil {
-		slog.Error("Error starting server", slog.Any("error", err))
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", env.PORT),
+		Handler: router,
 	}
+
+	go func() {
+		slog.Info("Starting server...", slog.String("port", env.PORT))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("Error starting HTTP server", slog.Any("error", err))
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shut down the servers
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+	slog.Info("Graceful shutdown initiated...")
+
+	shutdownAsynq()
+
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctxShutdown); err != nil {
+		slog.Error("HTTP Server forced to shutdown", slog.Any("error", err))
+	}
+
+	slog.Info("Server exiting cleanly")
 }
