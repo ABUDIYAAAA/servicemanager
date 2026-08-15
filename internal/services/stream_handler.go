@@ -7,6 +7,11 @@ import (
 	"strconv"
 
 	"servicemanager/internal/middleware"
+	"servicemanager/internal/models"
+	"servicemanager/internal/utils"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // HandleServiceLogsStream provides a Server-Sent Events (SSE) stream of build and runtime logs for a specific service.
@@ -49,16 +54,35 @@ func (h *ServiceHandler) HandleServiceLogsStream(w http.ResponseWriter, r *http.
 			fmt.Fprintf(w, "data: %s\n\n", string(jsonData))
 			flusher.Flush()
 		}
-		if activeDeployment.RuntimeLogs != "" {
-			msg := ServiceLogMessage{
-				ServiceID:    id,
-				DeploymentID: activeDeployment.ID,
-				Type:         "runtime",
-				Log:          activeDeployment.RuntimeLogs,
+		
+		// Fetch recent runtime logs from MongoDB if connected
+		if utils.MongoClient != nil {
+			col := utils.MongoClient.Database("servicesmanager").Collection("runtime_logs")
+			filter := bson.M{"deployment_id": activeDeployment.ID}
+			
+			// Find up to 1000 latest logs
+			findOptions := options.Find()
+			findOptions.SetSort(bson.D{{Key: "timestamp", Value: 1}})
+			findOptions.SetLimit(1000)
+
+			cur, err := col.Find(ctx, filter, findOptions)
+			if err == nil {
+				for cur.Next(ctx) {
+					var event models.LogEvent
+					if err := cur.Decode(&event); err == nil {
+						msg := ServiceLogMessage{
+							ServiceID:    id,
+							DeploymentID: activeDeployment.ID,
+							Type:         "runtime",
+							Log:          event.Message,
+						}
+						jsonData, _ := json.Marshal(msg)
+						fmt.Fprintf(w, "data: %s\n\n", string(jsonData))
+					}
+				}
+				cur.Close(ctx)
+				flusher.Flush()
 			}
-			jsonData, _ := json.Marshal(msg)
-			fmt.Fprintf(w, "data: %s\n\n", string(jsonData))
-			flusher.Flush()
 		}
 	}
 

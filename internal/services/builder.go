@@ -221,7 +221,12 @@ func (b *ServiceBuilder) ExecuteDeployment(ctx context.Context, serviceID, deplo
 	}
 	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Starting container on port %d → %d...", hostPort, containerPort))
 
-	if err := docker.RunContainer(imageTag, oldContainerName, hostPort, containerPort, envVars); err != nil {
+	labels := map[string]string{
+		"seed.managed":      "true",
+		"seed.service_id":    fmt.Sprintf("%d", serviceID),
+		"seed.deployment_id": fmt.Sprintf("%d", deploymentID),
+	}
+	if err := docker.RunContainer(imageTag, oldContainerName, hostPort, containerPort, envVars, labels); err != nil {
 		return b.fail(ctx, serviceID, deploymentID, "Failed to start container", err)
 	}
 

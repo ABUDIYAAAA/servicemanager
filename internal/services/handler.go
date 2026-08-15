@@ -67,6 +67,47 @@ func (h *ServiceHandler) GetAllServices(w http.ResponseWriter, r *http.Request) 
 	utils.JsonResponse(w, http.StatusOK, services)
 }
 
+func (h *ServiceHandler) GetServiceByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid service id"))
+		return
+	}
+
+	service, err := h.service.GetServiceByID(ctx, id)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusNotFound, fmt.Errorf("service not found"))
+		return
+	}
+	utils.JsonResponse(w, http.StatusOK, service)
+}
+
+func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid service id"))
+		return
+	}
+
+	var payload UpdateServiceRequestPayload
+	if err := decodeJSON(r, &payload); err != nil {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid request body"))
+		return
+	}
+
+	svc, err := h.service.UpdateService(ctx, id, payload)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, svc)
+}
+
 func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userCtx, ok := ctx.Value(middleware.UserContextKey).(middleware.UserContext)
@@ -192,6 +233,24 @@ func (h *ServiceHandler) GetLatestDeployment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	utils.JsonResponse(w, http.StatusOK, dep)
+}
+
+// GetDeployments returns all deployments for a service.
+func (h *ServiceHandler) GetDeployments(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid service id"))
+		return
+	}
+
+	deps, err := h.service.GetDeploymentsByServiceID(ctx, id)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	utils.JsonResponse(w, http.StatusOK, deps)
 }
 
 func (h *ServiceHandler) DeleteService(w http.ResponseWriter, r *http.Request) {

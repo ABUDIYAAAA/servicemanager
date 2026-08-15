@@ -65,8 +65,8 @@ func StopAndRemoveContainer(name string) error {
 	return nil
 }
 
-// RunContainer starts a detached Docker container with port mapping and environment variables.
-func RunContainer(imageTag, containerName string, hostPort, containerPort int, envVars map[string]string) error {
+// RunContainer starts a detached Docker container with port mapping and environment variables, and optional labels.
+func RunContainer(imageTag, containerName string, hostPort, containerPort int, envVars map[string]string, labels map[string]string) error {
 	args := []string{
 		"run", "-d",
 		"--name", containerName,
@@ -76,6 +76,10 @@ func RunContainer(imageTag, containerName string, hostPort, containerPort int, e
 
 	for k, v := range envVars {
 		args = append(args, "-e", fmt.Sprintf("%s=%s", k, v))
+	}
+
+	for k, v := range labels {
+		args = append(args, "--label", fmt.Sprintf("%s=%s", k, v))
 	}
 
 	args = append(args, imageTag)

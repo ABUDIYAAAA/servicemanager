@@ -39,6 +39,10 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 			}
 
 			if tokenString == "" {
+				tokenString = r.URL.Query().Get("token")
+			}
+
+			if tokenString == "" {
 				utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization token missing"))
 				return
 			}

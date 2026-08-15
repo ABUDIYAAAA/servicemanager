@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"servicemanager/internal/deployment"
+	"servicemanager/internal/docker"
 	"servicemanager/internal/models"
 	"servicemanager/internal/utils"
 )
@@ -31,6 +32,27 @@ func (s *ServiceService) GetAllServices(ctx context.Context) ([]models.Service, 
 
 func (s *ServiceService) GetServiceByID(ctx context.Context, id int) (*models.Service, error) {
 	return s.repository.GetServiceByID(ctx, id)
+}
+
+func (s *ServiceService) UpdateService(ctx context.Context, id int, payload UpdateServiceRequestPayload) (*models.Service, error) {
+	svc, err := s.repository.GetServiceByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("service not found: %w", err)
+	}
+
+	if payload.EnvVars != nil && svc.InfisicalWorkspaceID != "" {
+		err = s.infisical.SyncSecrets(ctx, svc.InfisicalWorkspaceID, svc.InfisicalEnv, payload.EnvVars)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sync secrets to infisical: %w", err)
+		}
+	}
+
+	updatedSvc, err := s.repository.UpdateService(ctx, id, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update service in database: %w", err)
+	}
+
+	return updatedSvc, nil
 }
 
 func (s *ServiceService) CreateService(ctx context.Context, name, description, repoName, rootDirectory, buildCommand, runCommand, framework string, port int, envVars map[string]string, domain string) (*models.Service, error) {
@@ -101,6 +123,9 @@ func (s *ServiceService) DeleteService(ctx context.Context, id int) error {
 			return fmt.Errorf("failed to delete infisical project for service: %w", err)
 		}
 	}
+
+	containerName := fmt.Sprintf("svc-%d", id)
+	_ = docker.StopAndRemoveContainer(containerName)
 
 	return s.repository.DeleteService(ctx, id)
 }

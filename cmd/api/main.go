@@ -16,6 +16,7 @@ import (
 	"servicemanager/internal/mail"
 	"servicemanager/internal/queue"
 	"servicemanager/internal/router"
+	"servicemanager/internal/services"
 	"servicemanager/internal/utils"
 )
 
@@ -36,6 +37,9 @@ func main() {
 		cancel()
 		if mongoErr != nil {
 			fmt.Println("MongoDB connection failed, logging to stdout only:", mongoErr)
+		} else {
+			// Initialize TTL index for runtime_logs
+			services.InitMongoIndexes(context.Background(), utils.MongoClient)
 		}
 	}
 
@@ -85,6 +89,15 @@ func main() {
 			slog.Error("Error starting HTTP server", slog.Any("error", err))
 		}
 	}()
+
+	// Start Log Pipeline & Collector
+	services.StartLogPipeline(ctx, services.LogBroadcaster)
+	if collector, err := services.NewLogCollector(); err == nil {
+		collector.Start()
+		defer collector.Stop()
+	} else {
+		slog.Error("Failed to initialize Log Collector", slog.Any("error", err))
+	}
 
 	// Wait for interrupt signal to gracefully shut down the servers
 	quit := make(chan os.Signal, 1)

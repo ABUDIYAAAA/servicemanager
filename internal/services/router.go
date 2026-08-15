@@ -32,12 +32,15 @@ func ServiceRouter(pool *pgxpool.Pool, env *config.Env, asynqClient *asynq.Clien
 
 	// Read routes (authenticated users)
 	mux.Handle("GET /", authMw(http.HandlerFunc(handler.GetAllServices)))
+	mux.Handle("GET /{id}", authMw(http.HandlerFunc(handler.GetServiceByID)))
 	mux.Handle("GET /directories", authMw(http.HandlerFunc(handler.GetRepositoryDirectories)))
 	mux.Handle("GET /{id}/logs/stream", authMw(http.HandlerFunc(handler.HandleServiceLogsStream)))
 	mux.Handle("GET /{id}/deployment/latest", authMw(http.HandlerFunc(handler.GetLatestDeployment)))
+	mux.Handle("GET /{id}/deployments", authMw(http.HandlerFunc(handler.GetDeployments)))
 
 	// Write routes (admins only)
 	mux.Handle("POST /", adminOnly(http.HandlerFunc(handler.CreateService)))
+	mux.Handle("PUT /{id}", adminOnly(http.HandlerFunc(handler.UpdateService)))
 	mux.Handle("POST /{id}/deploy", adminOnly(http.HandlerFunc(handler.TriggerDeploy)))
 	mux.Handle("DELETE /{id}", adminOnly(http.HandlerFunc(handler.DeleteService)))
 

@@ -28,7 +28,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
 	                 port, framework, env_vars, infisical_workspace_id, infisical_env, 
-	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
+	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, domain, created_at 
 	          FROM services ORDER BY id ASC`
 
 	rows, err := r.pool.Query(ctx, query)
@@ -49,11 +49,12 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 		var workspaceID *string
 		var infEnv *string
 		var dirPath *string
+		var domainScan *string
 
 		err := rows.Scan(
 			&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
 			&port, &framework, &envVarsBytes, &workspaceID, &infEnv,
-			&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
+			&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &domainScan, &s.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -93,6 +94,9 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 		if dirPath != nil {
 			s.DirectoryPath = *dirPath
 		}
+		if domainScan != nil {
+			s.Domain = *domainScan
+		}
 
 		services = append(services, s)
 	}
@@ -107,7 +111,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models.Service, error) {
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
 	                 port, framework, env_vars, infisical_workspace_id, infisical_env, 
-	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
+	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, domain, created_at 
 	          FROM services WHERE id = $1`
 
 	var s models.Service
@@ -121,11 +125,12 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 	var workspaceID *string
 	var infEnv *string
 	var dirPath *string
+	var domainScan *string
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
 		&port, &framework, &envVarsBytes, &workspaceID, &infEnv,
-		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
+		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &domainScan, &s.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -167,6 +172,9 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 	}
 	if dirPath != nil {
 		s.DirectoryPath = *dirPath
+	}
+	if domainScan != nil {
+		s.Domain = *domainScan
 	}
 
 	return &s, nil
@@ -242,6 +250,29 @@ func (r *ServiceRepository) CreateService(ctx context.Context, name string, desc
 	}
 
 	return &s, nil
+}
+
+func (r *ServiceRepository) UpdateService(ctx context.Context, id int, payload UpdateServiceRequestPayload) (*models.Service, error) {
+	envVarsBytes, err := json.Marshal(payload.EnvVars)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `UPDATE services 
+	          SET name = $2, description = $3, build_command = $4, run_command = $5, port = $6, domain = $7, env_vars = $8
+	          WHERE id = $1`
+
+	cmdTag, err := r.pool.Exec(
+		ctx, query, id, payload.Name, payload.Description, payload.BuildCommand, payload.RunCommand, payload.Port, payload.Domain, envVarsBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return nil, ErrServiceNotFound
+	}
+
+	return r.GetServiceByID(ctx, id)
 }
 
 func (r *ServiceRepository) UpdateDeployConfig(
