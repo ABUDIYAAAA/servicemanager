@@ -211,3 +211,78 @@ func (c *InfisicalClient) SyncSecrets(ctx context.Context, projectID, environmen
 
 	return nil
 }
+
+// DeleteProject deletes an Infisical project by its ID
+func (c *InfisicalClient) DeleteProject(ctx context.Context, projectID string) error {
+	if projectID == "" {
+		return nil
+	}
+
+	token, err := c.login(ctx)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/v1/projects/%s", c.BaseURL, projectID)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("failed to delete infisical project: status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// GetSecrets retrieves all secrets from an Infisical project environment as a key-value map.
+func (c *InfisicalClient) GetSecrets(ctx context.Context, projectID, environment string) (map[string]string, error) {
+	token, err := c.login(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/api/v3/secrets/raw?workspaceId=%s&environment=%s", c.BaseURL, projectID, environment)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch secrets from infisical: status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Secrets []struct {
+			SecretKey   string `json:"secretKey"`
+			SecretValue string `json:"secretValue"`
+		} `json:"secrets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	secrets := make(map[string]string, len(result.Secrets))
+	for _, s := range result.Secrets {
+		secrets[s.SecretKey] = s.SecretValue
+	}
+	return secrets, nil
+}
+

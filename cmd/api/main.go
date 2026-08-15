@@ -13,6 +13,7 @@ import (
 	migrations "servicemanager/cmd/migrate"
 	"servicemanager/internal/config"
 	"servicemanager/internal/database"
+	"servicemanager/internal/mail"
 	"servicemanager/internal/queue"
 	"servicemanager/internal/router"
 	"servicemanager/internal/utils"
@@ -48,8 +49,18 @@ func main() {
 		return
 	}
 
+	// Verify Redis connection and fail startup if unavailable
+	redisCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	err = queue.PingRedis(redisCtx, env.REDIS_URI)
+	cancel()
+	if err != nil {
+		slog.Error("Failed to connect to Redis", slog.Any("error", err), slog.String("uri", env.REDIS_URI))
+		os.Exit(1)
+	}
+
 	// Start SMTP Email Queue worker
-	utils.StartEmailWorker(ctx, env.SMTP_HOST, env.SMTP_PORT, env.SMTP_USER, env.SMTP_PASS, env.SMTP_FROM)
+	mailService := mail.NewMailService(env.SMTP_HOST, env.SMTP_PORT, env.SMTP_USER, env.SMTP_PASS, env.SMTP_FROM)
+	shutdownEmailWorker := mail.StartWorker(env.REDIS_URI, mailService)
 
 	// Connect to PostgreSQL database pool
 	pool, err := database.ConnectDB(env.DB_URL, ctx)
@@ -82,6 +93,7 @@ func main() {
 	slog.Info("Graceful shutdown initiated...")
 
 	shutdownAsynq()
+	shutdownEmailWorker()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

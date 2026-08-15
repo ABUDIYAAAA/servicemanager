@@ -27,7 +27,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 	var services []models.Service
 
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
-	                 port, env_vars, infisical_workspace_id, infisical_env, 
+	                 port, framework, env_vars, infisical_workspace_id, infisical_env, 
 	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
 	          FROM services ORDER BY id ASC`
 
@@ -44,6 +44,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 		var buildCmd *string
 		var runCmd *string
 		var port *int
+		var framework *string
 		var envVarsBytes []byte
 		var workspaceID *string
 		var infEnv *string
@@ -51,11 +52,15 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 
 		err := rows.Scan(
 			&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
-			&port, &envVarsBytes, &workspaceID, &infEnv,
+			&port, &framework, &envVarsBytes, &workspaceID, &infEnv,
 			&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
+		}
+		
+		if framework != nil {
+			s.Framework = *framework
 		}
 
 		if desc != nil {
@@ -101,7 +106,7 @@ func (r *ServiceRepository) GetAllServices(ctx context.Context) ([]models.Servic
 
 func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models.Service, error) {
 	query := `SELECT id, name, description, github_repo_name, status, build_command, run_command, 
-	                 port, env_vars, infisical_workspace_id, infisical_env, 
+	                 port, framework, env_vars, infisical_workspace_id, infisical_env, 
 	                 directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at 
 	          FROM services WHERE id = $1`
 
@@ -111,6 +116,7 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 	var buildCmd *string
 	var runCmd *string
 	var port *int
+	var framework *string
 	var envVarsBytes []byte
 	var workspaceID *string
 	var infEnv *string
@@ -118,7 +124,7 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&s.ID, &s.Name, &desc, &repoName, &s.Status, &buildCmd, &runCmd,
-		&port, &envVarsBytes, &workspaceID, &infEnv,
+		&port, &framework, &envVarsBytes, &workspaceID, &infEnv,
 		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
 	)
 	if err != nil {
@@ -126,6 +132,10 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 			return nil, ErrServiceNotFound
 		}
 		return nil, err
+	}
+	
+	if framework != nil {
+		s.Framework = *framework
 	}
 
 	if desc != nil {
@@ -162,28 +172,35 @@ func (r *ServiceRepository) GetServiceByID(ctx context.Context, id int) (*models
 	return &s, nil
 }
 
-func (r *ServiceRepository) CreateService(ctx context.Context, name string, description string, repoName string) (*models.Service, error) {
-	query := `INSERT INTO services (name, description, github_repo_name, status, ssl_status, build_logs, runtime_logs, root_directory) 
-	          VALUES ($1, $2, $3, 'draft', 'inactive', '', '', '.') 
-	          RETURNING id, name, description, github_repo_name, status, build_command, run_command, 
+func (r *ServiceRepository) CreateService(ctx context.Context, name string, description string, repoName string, rootDirectory string, buildCommand string, runCommand string, framework string, port int, envVars map[string]string, domain string) (*models.Service, error) {
+	envVarsBytes, err := json.Marshal(envVars)
+	if err != nil {
+		envVarsBytes = []byte("{}")
+	}
+
+	query := `INSERT INTO services (name, description, github_repo_name, status, ssl_status, build_logs, runtime_logs, root_directory, build_command, run_command, framework, port, env_vars, domain) 
+	          VALUES ($1, $2, $3, 'draft', 'inactive', '', '', $4, $5, $6, $7, $8, $9, $10) 
+	          RETURNING id, name, description, github_repo_name, status, build_command, run_command, framework,
 	                    port, env_vars, infisical_workspace_id, infisical_env, 
-	                    directory_path, ssl_status, build_logs, runtime_logs, root_directory, created_at`
+	                    directory_path, ssl_status, build_logs, runtime_logs, root_directory, domain, created_at`
 
 	var s models.Service
 	var desc *string
 	var repoNameStr *string
 	var buildCmd *string
 	var runCmd *string
-	var port *int
-	var envVarsBytes []byte
+	var fw *string
+	var portScan *int
+	var envVarsScan []byte
 	var workspaceID *string
 	var infEnv *string
 	var dirPath *string
+	var domainScan *string
 
-	err := r.pool.QueryRow(ctx, query, name, description, repoName).Scan(
-		&s.ID, &s.Name, &desc, &repoNameStr, &s.Status, &buildCmd, &runCmd,
-		&port, &envVarsBytes, &workspaceID, &infEnv,
-		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &s.CreatedAt,
+	err = r.pool.QueryRow(ctx, query, name, description, repoName, rootDirectory, buildCommand, runCommand, framework, port, envVarsBytes, domain).Scan(
+		&s.ID, &s.Name, &desc, &repoNameStr, &s.Status, &buildCmd, &runCmd, &fw,
+		&portScan, &envVarsScan, &workspaceID, &infEnv,
+		&dirPath, &s.SSLStatus, &s.BuildLogs, &s.RuntimeLogs, &s.RootDirectory, &domainScan, &s.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -205,11 +222,14 @@ func (r *ServiceRepository) CreateService(ctx context.Context, name string, desc
 	if runCmd != nil {
 		s.RunCommand = *runCmd
 	}
-	if port != nil {
-		s.Port = *port
+	if fw != nil {
+		s.Framework = *fw
 	}
-	if len(envVarsBytes) > 0 {
-		_ = json.Unmarshal(envVarsBytes, &s.EnvVars)
+	if portScan != nil {
+		s.Port = *portScan
+	}
+	if len(envVarsScan) > 0 {
+		_ = json.Unmarshal(envVarsScan, &s.EnvVars)
 	}
 	if s.EnvVars == nil {
 		s.EnvVars = make(map[string]string)

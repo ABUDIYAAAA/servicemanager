@@ -7,13 +7,14 @@ import (
 	"servicemanager/internal/middleware"
 	"servicemanager/internal/models"
 
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
+func UserRouter(pool *pgxpool.Pool, env *config.Env, asynqClient *asynq.Client) (*http.ServeMux, *UserHandler) {
 	mux := http.NewServeMux()
 	userRepo := NewUserRepository(pool)
-	userService := NewUserService(userRepo, env.JWT_SECRET, env.JWT_EXPIRY, env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY, env.BASE_URL)
+	userService := NewUserService(userRepo, env.JWT_SECRET, env.JWT_EXPIRY, env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY, env.BASE_URL, asynqClient)
 	userHandler := NewUserHandler(userService)
 
 	// Public Routes
@@ -32,6 +33,7 @@ func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 	// Authenticated Routes
 	mux.Handle("GET /me", authMw(http.HandlerFunc(userHandler.GetMe)))
 	mux.Handle("POST /github/installations", authMw(http.HandlerFunc(userHandler.InstallGithub)))
+	mux.Handle("DELETE /github/installations", authMw(http.HandlerFunc(userHandler.DisconnectGithub)))
 	mux.Handle("GET /github/repos", authMw(http.HandlerFunc(userHandler.GetGithubRepositories)))
 	mux.Handle("GET /github/url", authMw(http.HandlerFunc(userHandler.GetGithubURL)))
 	mux.Handle("GET /", authMw(http.HandlerFunc(userHandler.GetAllUsers)))
@@ -43,5 +45,5 @@ func UserRouter(pool *pgxpool.Pool, env *config.Env) *http.ServeMux {
 	mux.Handle("POST /invite", adminOnly(http.HandlerFunc(userHandler.CreateNewInvite)))
 	mux.Handle("DELETE /invite/{email}", adminOnly(http.HandlerFunc(userHandler.DeleteInvite)))
 
-	return mux
+	return mux, userHandler
 }

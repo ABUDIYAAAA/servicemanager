@@ -2,6 +2,12 @@ package models
 
 import "time"
 
+type RepositoryDetails struct {
+	Directories []string `json:"directories"`
+	Frameworks  map[string]string `json:"frameworks"`
+}
+
+
 type GithubInstallation struct {
 	ID             int       `json:"id"`
 	UserID         int       `json:"user_id"`

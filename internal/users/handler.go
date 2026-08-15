@@ -135,7 +135,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:  "token",
 		Value: res.Token,
-
+		Path:  "/",
 		MaxAge:   365 * 24 * 3600, // 1 year expiry
 		HttpOnly: true,
 		Secure:   false, // Set to true if running over HTTPS
@@ -149,11 +149,21 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// Revoke the HttpOnly token cookie by setting MaxAge to -1
+	// Revoke the new global cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
 		Value:    "",
 		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
+	// Revoke the old incorrectly scoped cookie to unstuck existing users
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/api/v1/users",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   false,
@@ -388,4 +398,40 @@ func (h *UserHandler) GetGithubURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.JsonResponse(w, http.StatusOK, map[string]string{"url": url})
+}
+
+func (h *UserHandler) DisconnectGithub(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userCtx, ok := r.Context().Value(middleware.UserContextKey).(middleware.UserContext)
+	if !ok {
+		utils.ErrorResponse(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
+		return
+	}
+
+	err := h.service.DisconnectGithub(ctx, userCtx.UserID)
+	if err != nil {
+		utils.ErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, map[string]string{"message": "github disconnected successfully"})
+}
+
+func (h *UserHandler) GetGithubCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userCtx, ok := ctx.Value(middleware.UserContextKey).(middleware.UserContext)
+	if !ok {
+		http.Redirect(w, r, "http://localhost:3001/login", http.StatusTemporaryRedirect)
+		return
+	}
+
+	installationIDStr := r.URL.Query().Get("installation_id")
+	if installationIDStr != "" {
+		installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
+		if err == nil && installationID != 0 {
+			_ = h.service.InstallGithub(ctx, userCtx.UserID, installationID)
+		}
+	}
+
+	http.Redirect(w, r, "http://localhost:3001/dashboard", http.StatusTemporaryRedirect)
 }

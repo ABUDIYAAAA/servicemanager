@@ -319,30 +319,30 @@ type GithubTreeResponse struct {
 	} `json:"tree"`
 }
 
-func GetRepositoryDirectories(token string, repoFullName string) ([]string, error) {
+func GetRepositoryDirectories(token string, repoFullName string) ([]string, []string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s", repoFullName)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch repo info: status code %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("failed to fetch repo info: status code %d", resp.StatusCode)
 	}
 
 	var repoInfo struct {
 		DefaultBranch string `json:"default_branch"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&repoInfo); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	branch := repoInfo.DefaultBranch
@@ -353,35 +353,38 @@ func GetRepositoryDirectories(token string, repoFullName string) ([]string, erro
 	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/git/trees/%s?recursive=1", repoFullName, branch)
 	treeReq, err := http.NewRequest("GET", treeURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	treeReq.Header.Set("Authorization", "token "+token)
 	treeReq.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	treeResp, err := http.DefaultClient.Do(treeReq)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer treeResp.Body.Close()
 
 	if treeResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch git tree: status code %d", treeResp.StatusCode)
+		return nil, nil, fmt.Errorf("failed to fetch git tree: status code %d", treeResp.StatusCode)
 	}
 
 	var treeResponse GithubTreeResponse
 	if err := json.NewDecoder(treeResp.Body).Decode(&treeResponse); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var dirs []string
+	var files []string
 	dirs = append(dirs, ".")
 
 	for _, item := range treeResponse.Tree {
 		if item.Type == "tree" {
 			dirs = append(dirs, item.Path)
+		} else if item.Type == "blob" {
+			files = append(files, item.Path)
 		}
 	}
 
-	return dirs, nil
+	return dirs, files, nil
 }
 

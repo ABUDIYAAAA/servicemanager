@@ -9,6 +9,7 @@ import (
 	"servicemanager/internal/queue"
 	"servicemanager/internal/services"
 	"servicemanager/internal/users"
+	"servicemanager/internal/utils"
 	"servicemanager/internal/webhook"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,7 +21,8 @@ func Router(pool *pgxpool.Pool, env *config.Env) http.Handler {
 
 	serviceRepo := services.NewServiceRepository(pool)
 	deployRepo := services.NewDeploymentRepository(pool)
-	serviceService := services.NewServiceService(serviceRepo, deployRepo)
+	infisicalClient := utils.NewInfisicalClient(env.INFISICAL_URL, env.INFISICAL_CLIENT_ID, env.INFISICAL_CLIENT_SECRET)
+	serviceService := services.NewServiceService(serviceRepo, deployRepo, infisicalClient)
 
 	// Initialize ServiceBuilder
 	builder := services.NewServiceBuilder(pool, deployRepo, env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY, env.SERVICES_ROOT_DIR)
@@ -32,17 +34,20 @@ func Router(pool *pgxpool.Pool, env *config.Env) http.Handler {
 	queue.SetDeployHandler(builder.ExecuteDeployment)
 
 	// Routers for APIs
-	userRouter := users.UserRouter(pool, env)
-	serviceRouter := services.ServiceRouter(pool, env)
+	userRouter, userHandler := users.UserRouter(pool, env, asynqClient)
+	serviceRouter := services.ServiceRouter(pool, env, asynqClient)
 
 	mux.Handle("/api/v1/users/", http.StripPrefix("/api/v1/users", userRouter))
 	mux.Handle("/api/v1/services/", http.StripPrefix("/api/v1/services", serviceRouter))
 
+	authMw := middleware.AuthMiddleware(env.JWT_SECRET)
+	
+	// GitHub OAuth Callback
+	mux.Handle("GET /github/callback", authMw(http.HandlerFunc(userHandler.GetGithubCallback)))
+
 	// Swagger documentation endpoints
 	mux.HandleFunc("GET /swagger.json", ServeSwaggerJSON)
 	mux.HandleFunc("GET /swagger/", ServeSwaggerUI)
-
-	authMw := middleware.AuthMiddleware(env.JWT_SECRET)
 
 	// GitHub Webhook (public — GitHub sends webhooks without auth)
 	webhookHandler := webhook.NewWebhookHandler(pool, serviceService, asynqClient, env.GITHUB_WEBHOOK_SECRET)

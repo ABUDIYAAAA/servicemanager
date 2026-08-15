@@ -1,37 +1,33 @@
 package services
 
 import (
-	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"servicemanager/internal/docker"
 	"servicemanager/internal/utils"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ActiveProcess struct {
-	Cmd          *exec.Cmd
-	Cancel       context.CancelFunc
-	DeploymentID int
-}
-
+// ServiceLogMessage is the payload sent over the SSE log stream.
 type ServiceLogMessage struct {
 	ServiceID    int    `json:"service_id"`
 	DeploymentID int    `json:"deployment_id"`
-	Type         string `json:"type"` // "build" or "runtime"
+	Type         string `json:"type"` // "build" | "runtime" | "status"
 	Log          string `json:"log"`
 }
 
+// ServiceLogBroadcaster multiplexes log events to connected SSE clients.
 type ServiceLogBroadcaster struct {
 	mu        sync.Mutex
-	listeners map[int][]chan ServiceLogMessage // keyed by service_id
+	listeners map[int][]chan ServiceLogMessage
 }
 
 var LogBroadcaster = &ServiceLogBroadcaster{
@@ -60,324 +56,266 @@ func (b *ServiceLogBroadcaster) Unregister(serviceID int, ch chan ServiceLogMess
 func (b *ServiceLogBroadcaster) Broadcast(msg ServiceLogMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	list := b.listeners[msg.ServiceID]
-	for _, ch := range list {
+	for _, ch := range b.listeners[msg.ServiceID] {
 		select {
 		case ch <- msg:
 		default:
-			// skip slow readers
 		}
 	}
 }
 
+// ServiceBuilder orchestrates Docker-based service deployments.
 type ServiceBuilder struct {
 	pool          *pgxpool.Pool
 	deployRepo    *DeploymentRepository
 	githubAppID   string
 	githubPrivKey string
-	workRootDir   string
-
-	mu         sync.Mutex
-	activeRuns map[int]*ActiveProcess // keyed by service_id
 }
 
-func NewServiceBuilder(pool *pgxpool.Pool, deployRepo *DeploymentRepository, appID, privKey, workRootDir string) *ServiceBuilder {
+func NewServiceBuilder(pool *pgxpool.Pool, deployRepo *DeploymentRepository, githubAppID, githubPrivKey, _ string) *ServiceBuilder {
 	return &ServiceBuilder{
 		pool:          pool,
 		deployRepo:    deployRepo,
-		githubAppID:   appID,
-		githubPrivKey: privKey,
-		workRootDir:   workRootDir,
-		activeRuns:    make(map[int]*ActiveProcess),
+		githubAppID:   githubAppID,
+		githubPrivKey: githubPrivKey,
 	}
 }
 
-// ExecuteDeployment is the main entry point called by the Asynq worker.
-// It performs the full deployment lifecycle: stop old processes, clone, build, run.
+// ExecuteDeployment is the Asynq worker handler for deployment.create tasks.
+// It is fully stateless: all state lives in Docker and the database.
 func (b *ServiceBuilder) ExecuteDeployment(ctx context.Context, serviceID, deploymentID, userID int) error {
-	// 1. Stop any active runtime process for this service
-	b.stopActiveProcess(serviceID)
+	slog.Info("Starting deployment", slog.Int("service_id", serviceID), slog.Int("deployment_id", deploymentID))
 
-	// 2. Mark all previous deployments as stopped
-	_ = b.deployRepo.StopAllActiveDeployments(ctx, serviceID)
+	// 1. Cancel any other queued deployments for this service (keep only this one running)
+	if err := b.deployRepo.CancelQueuedDeploymentsExcept(ctx, serviceID, deploymentID); err != nil {
+		slog.Warn("Failed to cancel stale queued deployments", slog.Any("error", err))
+	}
 
-	// Re-activate current deployment (it was just stopped by the blanket stop above)
+	// 2. Mark as building
 	_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "building")
+	b.updateServiceStatus(serviceID, "building")
+	b.broadcast(serviceID, deploymentID, "status", "Building...")
 
-	// 3. Fetch the service details
+	// 3. Fetch service record
 	var service struct {
-		Name           string
-		GithubRepoName string
-		BuildCommand   string
-		RunCommand     string
-		EnvVars        map[string]string
-		RootDirectory  string
+		Name          string
+		GithubRepo    string
+		RootDirectory string
+		BuildCommand  string
+		RunCommand    string
+		Framework     string
+		Port          int
+		WorkspaceID   string
+		InfisicalEnv  string
+		Domain        *string
 	}
-
-	var githubRepoName *string
-	var buildCommand *string
-	var runCommand *string
-
 	err := b.pool.QueryRow(ctx,
-		`SELECT name, github_repo_name, build_command, run_command, env_vars, root_directory FROM services WHERE id = $1`, serviceID,
-	).Scan(&service.Name, &githubRepoName, &buildCommand, &runCommand, &service.EnvVars, &service.RootDirectory)
+		`SELECT name, github_repo_name, root_directory, build_command, run_command, framework, port, infisical_workspace_id, infisical_env, domain
+		 FROM services WHERE id = $1`, serviceID,
+	).Scan(
+		&service.Name, &service.GithubRepo, &service.RootDirectory,
+		&service.BuildCommand, &service.RunCommand, &service.Framework,
+		&service.Port, &service.WorkspaceID, &service.InfisicalEnv, &service.Domain,
+	)
 	if err != nil {
-		b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Error: failed to fetch service: %v", err))
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		return err
+		return b.fail(ctx, serviceID, deploymentID, "Failed to fetch service record", err)
 	}
 
-	if githubRepoName != nil {
-		service.GithubRepoName = *githubRepoName
-	}
-	if buildCommand != nil {
-		service.BuildCommand = *buildCommand
-	}
-	if runCommand != nil {
-		service.RunCommand = *runCommand
-	}
-
-	if service.EnvVars == nil {
-		service.EnvVars = make(map[string]string)
-	}
-
-	// 4. Prepare workspace directory
-	targetDir := filepath.Join(b.workRootDir, fmt.Sprintf("service-%d", serviceID))
-
-	// Clean up old deployment files
-	_ = os.RemoveAll(targetDir)
-	_ = os.MkdirAll(targetDir, 0755)
-
-	_ = b.deployRepo.SetDeploymentDirectory(ctx, deploymentID, targetDir)
-
-	// Also update the service record
-	_, _ = b.pool.Exec(ctx, "UPDATE services SET directory_path = $2 WHERE id = $1", serviceID, targetDir)
-
-	b.appendBuildLog(serviceID, deploymentID, "Initializing workspace directory...")
-
-	// 5. Get GitHub installation token
+	// 4. Get GitHub installation token
 	var installationID int64
-	err = b.pool.QueryRow(ctx,
-		"SELECT installation_id FROM github_installations WHERE user_id = $1 LIMIT 1", userID,
+	_ = b.pool.QueryRow(ctx,
+		`SELECT installation_id FROM github_installations WHERE user_id = $1 LIMIT 1`, userID,
 	).Scan(&installationID)
-
-	if err != nil {
-		// Fallback: try any installation that has access
-		err = b.pool.QueryRow(ctx,
-			"SELECT installation_id FROM github_installations LIMIT 1",
+	if installationID == 0 {
+		// fallback to any installation
+		_ = b.pool.QueryRow(ctx,
+			`SELECT installation_id FROM github_installations LIMIT 1`,
 		).Scan(&installationID)
 	}
-
-	if err != nil {
-		b.appendBuildLog(serviceID, deploymentID, "Error: No GitHub App installation found. Cannot clone repository.")
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		return fmt.Errorf("no github installation found")
+	if installationID == 0 {
+		return b.fail(ctx, serviceID, deploymentID, "No GitHub installation found", fmt.Errorf("no github installation"))
 	}
 
 	token, err := utils.GetInstallationAccessToken(b.githubAppID, b.githubPrivKey, installationID)
 	if err != nil {
-		b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Error generating access token: %v", err))
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		return err
+		return b.fail(ctx, serviceID, deploymentID, "Failed to get GitHub token", err)
 	}
 
-	// 6. Clone repository
-	b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Cloning repository: %s...", service.GithubRepoName))
-	err = utils.CloneRepository(token, service.GithubRepoName, targetDir)
+	// 5. Fetch env vars from Infisical (fresh at deploy time)
+	envVars := map[string]string{}
+	if service.WorkspaceID != "" {
+		infisicalURL, _ := b.getConfigValue(ctx, "INFISICAL_URL")
+		infisicalClientID, _ := b.getConfigValue(ctx, "INFISICAL_CLIENT_ID")
+		infisicalClientSecret, _ := b.getConfigValue(ctx, "INFISICAL_CLIENT_SECRET")
+		if infisicalURL != "" && infisicalClientID != "" && infisicalClientSecret != "" {
+			infClient := utils.NewInfisicalClient(infisicalURL, infisicalClientID, infisicalClientSecret)
+			fetched, ferr := infClient.GetSecrets(ctx, service.WorkspaceID, service.InfisicalEnv)
+			if ferr != nil {
+				b.log(serviceID, deploymentID, "build", fmt.Sprintf("Warning: Could not fetch secrets from Infisical: %v", ferr))
+			} else {
+				envVars = fetched
+			}
+		}
+	} else {
+		// Fall back to env_vars stored in DB
+		var envJSON []byte
+		_ = b.pool.QueryRow(ctx, `SELECT env_vars FROM services WHERE id = $1`, serviceID).Scan(&envJSON)
+		if len(envJSON) > 0 {
+			_ = json.Unmarshal(envJSON, &envVars)
+		}
+	}
+
+	// 6. Clone repository to temp directory
+	cloneDir, err := os.MkdirTemp("", fmt.Sprintf("svc-%d-deploy-%d-*", serviceID, deploymentID))
 	if err != nil {
-		b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Clone failed: %v", err))
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		return err
+		return b.fail(ctx, serviceID, deploymentID, "Failed to create temp directory", err)
 	}
-	b.appendBuildLog(serviceID, deploymentID, "Repository cloned successfully.")
+	defer os.RemoveAll(cloneDir)
 
-	// 7. Execute Build Command
-	if service.BuildCommand != "" {
-		b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Running build command: %s", service.BuildCommand))
-
-		buildDir := targetDir
-		if service.RootDirectory != "" && service.RootDirectory != "." {
-			buildDir = filepath.Join(targetDir, service.RootDirectory)
-		}
-		cmd := exec.CommandContext(ctx, "sh", "-c", service.BuildCommand)
-		cmd.Dir = buildDir
-
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Error acquiring stdout: %v", err))
-			_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-			b.updateServiceStatus(serviceID, "failed")
-			return err
-		}
-		cmd.Stderr = cmd.Stdout
-
-		if err := cmd.Start(); err != nil {
-			b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Failed to start build: %v", err))
-			_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-			b.updateServiceStatus(serviceID, "failed")
-			return err
-		}
-
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			b.appendBuildLog(serviceID, deploymentID, scanner.Text())
-		}
-
-		if err := cmd.Wait(); err != nil {
-			b.appendBuildLog(serviceID, deploymentID, fmt.Sprintf("Build command failed: %v", err))
-			_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
-			b.updateServiceStatus(serviceID, "failed")
-			return err
-		}
-		b.appendBuildLog(serviceID, deploymentID, "Build completed successfully.")
-	} else {
-		b.appendBuildLog(serviceID, deploymentID, "No build command specified. Skipping build.")
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Cloning %s...", service.GithubRepo))
+	if err := utils.CloneRepository(token, service.GithubRepo, cloneDir); err != nil {
+		return b.fail(ctx, serviceID, deploymentID, "Clone failed", err)
 	}
+	b.log(serviceID, deploymentID, "build", "Repository cloned successfully.")
 
-	// 8. Start Runtime Process
-	if service.RunCommand != "" {
-		b.appendBuildLog(serviceID, deploymentID, "Starting runtime process...")
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "running")
-		runDir := targetDir
-		if service.RootDirectory != "" && service.RootDirectory != "." {
-			runDir = filepath.Join(targetDir, service.RootDirectory)
-		}
-		b.startRuntimeProcess(serviceID, deploymentID, service.RunCommand, runDir, service.EnvVars)
-	} else {
-		b.appendBuildLog(serviceID, deploymentID, "No run command specified. Deployment completed.")
-		_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "stopped")
-		b.updateServiceStatus(serviceID, "inactive")
+	// 7. Generate and write Dockerfile
+	rootDir := service.RootDirectory
+	if rootDir == "" {
+		rootDir = "."
+	}
+	dockerfileContent := docker.GenerateDockerfile(service.Framework, service.BuildCommand, service.RunCommand, rootDir, service.Port)
+	dockerfilePath := filepath.Join(cloneDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
+		return b.fail(ctx, serviceID, deploymentID, "Failed to write Dockerfile", err)
+	}
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Generated Dockerfile for %s framework.", service.Framework))
+
+	// 8. Find a free host port above 4000
+	hostPort, err := docker.FreePort(4000)
+	if err != nil {
+		return b.fail(ctx, serviceID, deploymentID, "No free port available", err)
+	}
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Allocated host port %d.", hostPort))
+
+	// 9. Build Docker image
+	imageTag := fmt.Sprintf("svc-%d:deploy-%d", serviceID, deploymentID)
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Building Docker image %s...", imageTag))
+
+	buildErr := docker.BuildImage(ctx, imageTag, cloneDir, func(line string) {
+		b.log(serviceID, deploymentID, "build", line)
+	})
+	if buildErr != nil {
+		return b.fail(ctx, serviceID, deploymentID, "Docker build failed", buildErr)
+	}
+	b.log(serviceID, deploymentID, "build", "Docker image built successfully.")
+
+	// 10. Stop & remove the old container for this service (if any)
+	oldContainerName := fmt.Sprintf("svc-%d", serviceID)
+	b.log(serviceID, deploymentID, "build", "Stopping previous container (if running)...")
+	_ = docker.StopAndRemoveContainer(oldContainerName)
+
+	// 11. Run new container
+	containerPort := service.Port
+	if containerPort == 0 {
+		containerPort = 3000
+	}
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("Starting container on port %d → %d...", hostPort, containerPort))
+
+	if err := docker.RunContainer(imageTag, oldContainerName, hostPort, containerPort, envVars); err != nil {
+		return b.fail(ctx, serviceID, deploymentID, "Failed to start container", err)
 	}
 
+	// 12. Update DB: container info, deployment status = running
+	if err := b.deployRepo.UpdateContainerInfo(ctx, deploymentID, oldContainerName, hostPort); err != nil {
+		slog.Error("Failed to update container info in DB", slog.Any("error", err))
+	}
+	b.updateServiceStatus(serviceID, "active")
+	b.broadcast(serviceID, deploymentID, "status", fmt.Sprintf("running:%d", hostPort))
+
+	if service.Domain != nil && *service.Domain != "" {
+		domain := *service.Domain
+		b.log(serviceID, deploymentID, "build", fmt.Sprintf("Configuring custom domain %s...", domain))
+		
+		if err := docker.WriteNginxConfig(domain, hostPort); err != nil {
+			b.log(serviceID, deploymentID, "build", fmt.Sprintf("Warning: Failed to write Nginx config: %v", err))
+		} else {
+			if err := docker.ReloadNginx(); err != nil {
+				b.log(serviceID, deploymentID, "build", fmt.Sprintf("Warning: Failed to reload Nginx: %v", err))
+			} else {
+				b.log(serviceID, deploymentID, "build", "Nginx configured successfully. Setting up TLS with Certbot...")
+				if err := docker.SetupTLS(domain); err != nil {
+					b.log(serviceID, deploymentID, "build", fmt.Sprintf("Warning: Certbot TLS setup failed: %v", err))
+				} else {
+					b.log(serviceID, deploymentID, "build", "TLS configured successfully!")
+				}
+			}
+		}
+	}
+
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("✓ Deployment complete. Service running on port %d.", hostPort))
+	slog.Info("Deployment complete",
+		slog.Int("service_id", serviceID),
+		slog.Int("deployment_id", deploymentID),
+		slog.Int("host_port", hostPort),
+	)
 	return nil
 }
 
-func (b *ServiceBuilder) startRuntimeProcess(serviceID, deploymentID int, runCmd, dir string, envVars map[string]string) {
-	b.stopActiveProcess(serviceID)
-
-	runCtx, cancel := context.WithCancel(context.Background())
-
-	cmd := exec.CommandContext(runCtx, "sh", "-c", runCmd)
-	cmd.Dir = dir
-
-	// Inject environment variables
-	cmd.Env = os.Environ()
-	for k, v := range envVars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		b.appendRuntimeLog(serviceID, deploymentID, fmt.Sprintf("Error creating stdout pipe: %v", err))
-		_ = b.deployRepo.UpdateDeploymentStatus(context.Background(), deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		cancel()
-		return
-	}
-	cmd.Stderr = cmd.Stdout
-
-	if err := cmd.Start(); err != nil {
-		b.appendRuntimeLog(serviceID, deploymentID, fmt.Sprintf("Failed to start runtime: %v", err))
-		_ = b.deployRepo.UpdateDeploymentStatus(context.Background(), deploymentID, "failed")
-		b.updateServiceStatus(serviceID, "failed")
-		cancel()
-		return
-	}
-
-	b.mu.Lock()
-	b.activeRuns[serviceID] = &ActiveProcess{
-		Cmd:          cmd,
-		Cancel:       cancel,
-		DeploymentID: deploymentID,
-	}
-	b.mu.Unlock()
-
-	b.updateServiceStatus(serviceID, "active")
-	b.appendRuntimeLog(serviceID, deploymentID, fmt.Sprintf("Runtime started (PID: %d).", cmd.Process.Pid))
-
-	go func() {
-		defer cancel()
-
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			b.appendRuntimeLog(serviceID, deploymentID, scanner.Text())
-		}
-
-		exitMsg := "Runtime process exited cleanly."
-		finalStatus := "stopped"
-		if err := cmd.Wait(); err != nil {
-			exitMsg = fmt.Sprintf("Runtime process exited: %v", err)
-			finalStatus = "failed"
-		}
-
-		b.appendRuntimeLog(serviceID, deploymentID, exitMsg)
-		_ = b.deployRepo.UpdateDeploymentStatus(context.Background(), deploymentID, finalStatus)
-		b.updateServiceStatus(serviceID, "inactive")
-
-		b.mu.Lock()
-		if active, ok := b.activeRuns[serviceID]; ok && active.Cmd == cmd {
-			delete(b.activeRuns, serviceID)
-		}
-		b.mu.Unlock()
-	}()
-}
-
-func (b *ServiceBuilder) stopActiveProcess(serviceID int) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if active, exists := b.activeRuns[serviceID]; exists {
-		active.Cancel()
-		if active.Cmd.Process != nil {
-			_ = active.Cmd.Process.Kill()
-		}
-		delete(b.activeRuns, serviceID)
-	}
-}
-
-// StopService stops the runtime process for a service (admin action).
+// StopService stops the running container for a service.
 func (b *ServiceBuilder) StopService(serviceID int) {
-	b.stopActiveProcess(serviceID)
+	containerName := fmt.Sprintf("svc-%d", serviceID)
+	_ = docker.StopAndRemoveContainer(containerName)
 	b.updateServiceStatus(serviceID, "inactive")
 }
 
-// --- Log helpers ---
+// --- Helpers ---
 
-func (b *ServiceBuilder) appendBuildLog(serviceID, deploymentID int, logLine string) {
-	slog.Info("[BUILD]", slog.Int("service_id", serviceID), slog.Int("deployment_id", deploymentID), slog.String("log", logLine))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_ = b.deployRepo.AppendBuildLog(ctx, deploymentID, logLine)
-
-	LogBroadcaster.Broadcast(ServiceLogMessage{
-		ServiceID:    serviceID,
-		DeploymentID: deploymentID,
-		Type:         "build",
-		Log:          logLine,
-	})
+func (b *ServiceBuilder) fail(ctx context.Context, serviceID, deploymentID int, msg string, err error) error {
+	b.log(serviceID, deploymentID, "build", fmt.Sprintf("✗ Error: %s: %v", msg, err))
+	_ = b.deployRepo.UpdateDeploymentStatus(ctx, deploymentID, "failed")
+	b.updateServiceStatus(serviceID, "failed")
+	b.broadcast(serviceID, deploymentID, "status", "failed")
+	return fmt.Errorf("%s: %w", msg, err)
 }
 
-func (b *ServiceBuilder) appendRuntimeLog(serviceID, deploymentID int, logLine string) {
-	slog.Info("[RUNTIME]", slog.Int("service_id", serviceID), slog.Int("deployment_id", deploymentID), slog.String("log", logLine))
+func (b *ServiceBuilder) log(serviceID, deploymentID int, logType, line string) {
+	slog.Info("[DEPLOY]",
+		slog.Int("service_id", serviceID),
+		slog.Int("deployment_id", deploymentID),
+		slog.String("type", logType),
+		slog.String("log", line),
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_ = b.deployRepo.AppendRuntimeLog(ctx, deploymentID, logLine)
 
+	if logType == "build" {
+		_ = b.deployRepo.AppendBuildLog(ctx, deploymentID, line)
+	} else {
+		_ = b.deployRepo.AppendRuntimeLog(ctx, deploymentID, line)
+	}
+
+	b.broadcast(serviceID, deploymentID, logType, line)
+}
+
+func (b *ServiceBuilder) broadcast(serviceID, deploymentID int, msgType, line string) {
 	LogBroadcaster.Broadcast(ServiceLogMessage{
 		ServiceID:    serviceID,
 		DeploymentID: deploymentID,
-		Type:         "runtime",
-		Log:          logLine,
+		Type:         msgType,
+		Log:          line,
 	})
 }
 
 func (b *ServiceBuilder) updateServiceStatus(serviceID int, status string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, _ = b.pool.Exec(ctx, "UPDATE services SET status = $2 WHERE id = $1", serviceID, status)
+	_, _ = b.pool.Exec(ctx, `UPDATE services SET status = $2 WHERE id = $1`, serviceID, status)
+}
+
+// getConfigValue reads an env-like config value from the process environment.
+// This avoids threading the full config struct into the builder.
+func (b *ServiceBuilder) getConfigValue(ctx context.Context, key string) (string, error) {
+	val := os.Getenv(key)
+	return val, nil
 }

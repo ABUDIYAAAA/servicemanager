@@ -1,0 +1,1 @@
+ALTER TABLE services ADD COLUMN framework VARCHAR(50) DEFAULT 'Other';

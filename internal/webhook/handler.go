@@ -212,9 +212,8 @@ func (h *WebhookHandler) handlePush(body []byte) {
 			continue
 		}
 
-		// Only deploy services that have been configured (not drafts)
-		if svc.RunCommand == "" {
-			slog.Info("Skipping draft service for push event", slog.String("service", svc.Name))
+		// Only deploy services that have a repo linked
+		if svc.GithubRepoName == "" {
 			continue
 		}
 
@@ -233,8 +232,8 @@ func (h *WebhookHandler) handlePush(body []byte) {
 			continue
 		}
 
-		// Enqueue deployment task
-		task, err := queue.NewDeployTask(svc.ID, deployment.ID, deployUserID)
+		// Enqueue deployment.create task
+		task, err := queue.NewDeploymentCreateTask(svc.ID, deployment.ID, deployUserID)
 		if err != nil {
 			slog.Error("Failed to create deploy task", slog.Any("error", err))
 			continue

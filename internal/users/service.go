@@ -11,6 +11,9 @@ import (
 
 	"servicemanager/internal/models"
 	"servicemanager/internal/utils"
+	"servicemanager/internal/mail"
+
+	"github.com/hibiken/asynq"
 )
 
 var (
@@ -26,9 +29,10 @@ type UserService struct {
 	githubAppID      string
 	githubPrivateKey string
 	baseURL          string
+	asynqClient      *asynq.Client
 }
 
-func NewUserService(userRepository *UserRepository, jwtSecret string, jwtExpiry string, githubAppID string, githubPrivateKey string, baseURL string) *UserService {
+func NewUserService(userRepository *UserRepository, jwtSecret string, jwtExpiry string, githubAppID string, githubPrivateKey string, baseURL string, asynqClient *asynq.Client) *UserService {
 	return &UserService{
 		repository:       userRepository,
 		jwtSecret:        jwtSecret,
@@ -36,6 +40,7 @@ func NewUserService(userRepository *UserRepository, jwtSecret string, jwtExpiry 
 		githubAppID:      githubAppID,
 		githubPrivateKey: githubPrivateKey,
 		baseURL:          baseURL,
+		asynqClient:      asynqClient,
 	}
 }
 
@@ -106,10 +111,12 @@ func (s *UserService) CreateInvite(ctx context.Context, email string) (*models.I
 			<p style="font-size:12px;color:#666;"><a href="%s">%s</a></p>
 		`, inviteURL, inviteURL, inviteURL)
 
-		utils.QueueHTMLEmail(
+		mail.QueueEmailTask(
+			s.asynqClient,
 			email,
 			"Invitation to Join Service Manager",
 			htmlBody,
+			true,
 		)
 	}
 	return invite, err
@@ -177,10 +184,12 @@ func (s *UserService) ForgotPassword(ctx context.Context, email string) (string,
 		return "", err
 	}
 
-	utils.QueueEmail(
+	mail.QueueEmailTask(
+		s.asynqClient,
 		email,
 		"Password Reset Request",
 		fmt.Sprintf("We received a request to reset your password. Use token %s to reset your password. This token expires in 1 hour.", token),
+		false,
 	)
 
 	return token, nil
@@ -276,4 +285,8 @@ func (s *UserService) GetGithubInstallURL() (string, error) {
 		return "https://github.com/apps/YOUR_APP_NAME/installations/new", nil
 	}
 	return url, nil
+}
+
+func (s *UserService) DisconnectGithub(ctx context.Context, userID int) error {
+	return s.repository.DeleteGithubInstallation(ctx, userID)
 }

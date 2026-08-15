@@ -11,6 +11,7 @@ type Service struct {
 	BuildCommand         string            `json:"build_command,omitempty"`
 	RunCommand           string            `json:"run_command,omitempty"`
 	Port                 int               `json:"port,omitempty"`
+	Framework            string            `json:"framework,omitempty"`
 	EnvVars              map[string]string `json:"env_vars,omitempty"`
 	InfisicalWorkspaceID string            `json:"infisical_workspace_id,omitempty"`
 	InfisicalEnv         string            `json:"infisical_env,omitempty"`
@@ -18,6 +19,7 @@ type Service struct {
 	SSLStatus            string            `json:"ssl_status,omitempty"`
 	BuildLogs            string            `json:"build_logs,omitempty"`
 	RuntimeLogs          string            `json:"runtime_logs,omitempty"`
+	Domain               string            `json:"domain,omitempty"`
 	RootDirectory        string            `json:"root_directory"`
 	CreatedAt            time.Time         `json:"created_at"`
 }
